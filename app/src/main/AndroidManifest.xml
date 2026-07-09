@@ -2,7 +2,106 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!--
+        ============================================================
+        BLUETOOTH / NEARBY CONNECTIONS
+        ============================================================
+        Permisos legacy (Android 11 / API 30 y anteriores).
+        Necesarios para descubrimiento BLE clásico y descubrimiento
+        basado en ubicación que exige Nearby Connections.
+    -->
+    <uses-permission
+        android:name="android.permission.BLUETOOTH"
+        android:maxSdkVersion="30" />
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_ADMIN"
+        android:maxSdkVersion="30" />
+
+    <!--
+        Permisos runtime introducidos en Android 12 (API 31).
+        BLUETOOTH_SCAN, BLUETOOTH_ADVERTISE y BLUETOOTH_CONNECT
+        reemplazan a los permisos legacy en Android 12+.
+    -->
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation"
+        tools:targetApi="s" />
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_ADVERTISE"
+        tools:targetApi="s" />
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_CONNECT"
+        tools:targetApi="s" />
+
+    <!--
+        Permisos Android 13 (API 33) y superiores.
+        NEARBY_WIFI_DEVICES es necesario para que Nearby Connections
+        pueda usar Wi-Fi Direct como transporte. En API 33+ se
+        solicita este permiso en lugar de ACCESS_FINE_LOCATION
+        para descubrir dispositivos Wi-Fi cercanos.
+    -->
+    <uses-permission
+        android:name="android.permission.NEARBY_WIFI_DEVICES"
+        android:usesPermissionFlags="neverForLocation"
+        tools:targetApi="tiramisu" />
+
+    <!--
+        Ubicación precisa. Sigue siendo obligatoria incluso en
+        Android 13+ para el escaneo Bluetooth clásico. Por eso
+        la declaramos sin maxSdkVersion. En Android 12+ también
+        se debe declarar COARSE para que el usuario pueda
+        conceder solo ubicación aproximada.
+    -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+    <!--
+        ============================================================
+        NOTIFICACIONES
+        ============================================================
+        Necesario desde Android 13 (API 33) para mostrar la
+        notificación persistente del Foreground Service.
+    -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!--
+        ============================================================
+        FOREGROUND SERVICE
+        ============================================================
+        FOREGROUND_SERVICE es obligatorio desde API 28.
+        FOREGROUND_SERVICE_CONNECTED_DEVICE es el sub-tipo correcto
+        para servicios que mantienen conexiones Bluetooth activas
+        (introducido en API 34 / Android 14).
+    -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission
+        android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE"
+        tools:targetApi="34" />
+
+    <!--
+        ============================================================
+        HARDWARE FEATURES
+        ============================================================
+        Declaramos las capacidades como requeridas=false para que
+        Google Play permita instalar la app en dispositivos que no
+        cuenten con Bluetooth, aunque en tiempo de ejecución la
+        app degrade la experiencia (modo sólo-online).
+    -->
+    <uses-feature
+        android:name="android.hardware.bluetooth"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.bluetooth_le"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.wifi"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.wifi.direct"
+        android:required="false" />
+
     <application
+        android:name=".AirVibeApplication"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -11,6 +110,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.AirVibe">
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -22,6 +122,47 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!--
+            Servicio en primer plano que mantiene el radar vivo
+            mientras la app no está en foco. El atributo
+            android:foregroundServiceType es obligatorio a partir
+            de Android 14 (API 34) y debe coincidir con el permiso
+            FOREGROUND_SERVICE_CONNECTED_DEVICE declarado arriba.
+        -->
+        <service
+            android:name=".feature.radar.data.device.service.AirVibeScannerService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
+
+        <!--
+            Queries para que Android 11+ pueda descubrir la
+            aplicación Nearby Connections de Google Play Services
+            (que es un servicio del sistema, no de otra app).
+        -->
+
+        <!--
+            Deshabilitamos el inicializador automático de
+            WorkManager para que use la `Configuration` que
+            exponemos en [AirVibeApplication]. El arranque bajo
+            demanda sigue siendo correcto.
+        -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                android:value="androidx.startup"
+                tools:node="remove" />
+        </provider>
     </application>
+
+    <queries>
+        <intent>
+            <action android:name="com.google.android.gms.nearby.connection.SERVICE" />
+        </intent>
+    </queries>
 
 </manifest>

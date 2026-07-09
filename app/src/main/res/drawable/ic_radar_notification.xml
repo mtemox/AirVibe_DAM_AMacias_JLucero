@@ -1,0 +1,44 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="#FFFFFF">
+
+    <!--
+        Icono "radar" para la notificación persistente del
+        Foreground Service. Tres anillos concéntricos con un
+        trazo central y un punto de origen: representa el radar
+        bluetooth de AirVibe.
+    -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.6"
+        android:pathData="M12,12 m-9,0 a9,9 0 1,0 18,0 a9,9 0 1,0 -18,0" />
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.6"
+        android:pathData="M12,12 m-6,0 a6,6 0 1,0 12,0 a6,6 0 1,0 -12,0" />
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.6"
+        android:pathData="M12,12 m-3,0 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M12,11 a1,1 0 1,0 0.01,0 z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M12,2 L12,5" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M12,19 L12,22" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M2,12 L5,12" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M19,12 L22,12" />
+</vector>

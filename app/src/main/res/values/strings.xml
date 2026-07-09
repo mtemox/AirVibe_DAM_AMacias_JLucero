@@ -1,3 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- App identity -->
     <string name="app_name">AirVibe</string>
+
+    <!-- Foreground Service -->
+    <string name="scanner_channel_name">Radar de proximidad</string>
+    <string name="scanner_channel_description">Mantiene activo el escaneo Bluetooth y Wi-Fi Direct para descubrir personas y servicios cercanos.</string>
+    <string name="scanner_notification_title">Radar AirVibe activo</string>
+    <string name="scanner_notification_text">Buscando personas y servicios a tu alrededor</string>
+    <string name="scanner_notification_text_paused">Escaneo en pausa</string>
+
+    <!-- Permission modal -->
+    <string name="permissions_modal_title">Activa tu radar</string>
+    <string name="permissions_modal_subtitle">AirVibe necesita acceso a sensores cercanos para descubrir personas y servicios en tu entorno, incluso sin internet.</string>
+    <string name="permissions_modal_action_grant">Conceder permisos</string>
+    <string name="permissions_modal_action_settings">Abrir ajustes</string>
+    <string name="permissions_modal_action_later">Más tarde</string>
+
+    <string name="permission_rationale_scan">Necesitamos Bluetooth para detectar dispositivos cercanos a tu posición.</string>
+    <string name="permission_rationale_advertise">Para que otros AirVibe puedan verte en su radar, necesitamos anunciar tu presencia por Bluetooth.</string>
+    <string name="permission_rationale_connect">Conceder acceso a Bluetooth para intercambiar perfiles con los nodos detectados.</string>
+    <string name="permission_rationale_location">La ubicación precisa mejora la precisión del radar. Nunca salimos de tu dispositivo.</string>
+    <string name="permission_rationale_wifi">Permitimos que tu dispositivo use Wi-Fi Direct para encontrarte con más nodos.</string>
+    <string name="permission_rationale_notifications">Te avisaremos cuando encontremos un servicio o contacto que buscabas.</string>
+
+    <string name="permission_title_bluetooth_scan">Escaneo Bluetooth</string>
+    <string name="permission_title_bluetooth_advertise">Anunciar presencia</string>
+    <string name="permission_title_bluetooth_connect">Conexión Bluetooth</string>
+    <string name="permission_title_location">Ubicación precisa</string>
+    <string name="permission_title_wifi">Dispositivos Wi-Fi cercanos</string>
+    <string name="permission_title_notifications">Notificaciones</string>
+
+    <!-- Scanner states -->
+    <string name="scanner_state_idle">En pausa</string>
+    <string name="scanner_state_starting">Iniciando radar…</string>
+    <string name="scanner_state_advertising">Transmitiendo tu presencia</string>
+    <string name="scanner_state_discovering">Buscando contactos cercanos</string>
+    <string name="scanner_state_error">Error de radar</string>
 </resources>
