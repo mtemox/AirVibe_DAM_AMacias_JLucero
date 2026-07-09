@@ -142,12 +142,14 @@ object SyncScheduler {
  */
 internal object SyncSchedulerApp {
     @Volatile
-    var context: Context = throw IllegalStateException(
-        "SyncSchedulerApp.context must be initialized in Application.onCreate",
-    )
-        private set
+    private var _context: Context? = null
+
+    val context: Context
+        get() = _context ?: throw IllegalStateException(
+            "SyncSchedulerApp.context must be initialized in Application.onCreate",
+        )
 
     fun initialize(context: Context) {
-        this.context = context.applicationContext
+        _context = context.applicationContext
     }
 }

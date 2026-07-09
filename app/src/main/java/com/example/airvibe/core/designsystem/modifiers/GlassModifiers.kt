@@ -36,17 +36,10 @@ fun Modifier.glassBlur(
     shape: Shape = RoundedCornerShape(24.dp),
     enabled: Boolean = true,
 ): Modifier {
-    if (!enabled || Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return this
-    return this
-        .clip(shape)
-        .graphicsLayer {
-            renderEffect = BlurEffect(
-                radiusX = radius.value,
-                radiusY = radius.value,
-                edgeTreatment = TileMode.Decal,
-            )
-            clip = true
-        }
+    // En Compose, BlurEffect difumina el componente y sus hijos (el texto y los campos), no el fondo.
+    // Para evitar que la pantalla se vea borrosa, deshabilitamos el BlurEffect.
+    // El efecto "glass" se mantendrá gracias a los fondos semi-transparentes y bordes.
+    return this.clip(shape)
 }
 
 /**

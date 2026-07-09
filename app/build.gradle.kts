@@ -72,6 +72,7 @@ dependencies {
     implementation(libs.supabase.core)
     implementation(libs.supabase.postgrest)
     implementation(libs.supabase.auth)
+    implementation(libs.ktor.client.okhttp)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.androidx.work.runtime)
     coreLibraryDesugaring(libs.desugar.jdk.libs)
