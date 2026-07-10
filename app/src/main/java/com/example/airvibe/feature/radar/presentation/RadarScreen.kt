@@ -46,6 +46,7 @@ import com.example.airvibe.core.designsystem.modifiers.glassShadow
 import com.example.airvibe.core.designsystem.theme.AirVibeTheme
 import com.example.airvibe.core.di.ServiceLocator
 import com.example.airvibe.core.permissions.rememberRadarPermissionsState
+import com.example.airvibe.feature.chat.presentation.components.MatchPreferencesSheet
 import com.example.airvibe.feature.radar.domain.model.RadarNode
 import com.example.airvibe.feature.radar.presentation.components.ProfilePreviewContent
 import com.example.airvibe.feature.radar.presentation.components.RadarControlPanel
@@ -57,10 +58,13 @@ import com.example.airvibe.feature.radar.presentation.components.permissions.Per
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RadarScreen(
+    onOpenChats: () -> Unit = {},
+    onOpenChat: (String) -> Unit = {},
     viewModel: RadarViewModel = radarViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val matchFiltersSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val permissionsState = rememberRadarPermissionsState()
 
     // Si el scanner falla por permisos, abrimos automáticamente el modal.
@@ -86,7 +90,9 @@ fun RadarScreen(
                 activeCount = state.activeNodeCount,
                 isScanning = state.isScanning,
                 discoveredPeers = state.discoveredPeers,
+                chatCount = state.unreadChatCount,
                 onSignOut = { viewModel.onEvent(RadarUiEvent.SignOut) },
+                onOpenChats = onOpenChats,
             )
 
             Box(
@@ -113,7 +119,7 @@ fun RadarScreen(
                     onScanToggle = { viewModel.onEvent(RadarUiEvent.ToggleScan) },
                     onBroadcast = { viewModel.onEvent(RadarUiEvent.Refresh) },
                     onCenter = { viewModel.onEvent(RadarUiEvent.Refresh) },
-                    onFilter = { viewModel.onEvent(RadarUiEvent.Refresh) },
+                    onFilter = { viewModel.onEvent(RadarUiEvent.OpenMatchFilters) },
                     isScanning = state.isScanning,
                 )
             }
@@ -145,7 +151,7 @@ fun RadarScreen(
                     profile = profile,
                     nodeKind = node.kind,
                     accentColor = node.accentColor,
-                    onConnect = { viewModel.onEvent(RadarUiEvent.Connect) },
+                    onConnect = { onOpenChat(node.id) },
                     onAddContact = { viewModel.onEvent(RadarUiEvent.AddToContacts) },
                     onToggleFavorite = { viewModel.onEvent(RadarUiEvent.AddToContacts) },
                     modifier = Modifier
@@ -167,6 +173,39 @@ fun RadarScreen(
                         .fillMaxWidth(),
                 )
             }
+        }
+    }
+
+    // Sheet de filtros de matching
+    if (state.isMatchFiltersVisible) {
+        ModalBottomSheet(
+            onDismissRequest = { viewModel.onEvent(RadarUiEvent.DismissMatchFilters) },
+            sheetState = matchFiltersSheetState,
+            containerColor = Color.Transparent,
+            scrimColor = Color.Black.copy(alpha = 0.45f),
+            dragHandle = null,
+        ) {
+            val sheetShape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)
+            MatchPreferencesSheet(
+                repository = ServiceLocator.matchPreferencesRepository,
+                onDismiss = { viewModel.onEvent(RadarUiEvent.DismissMatchFilters) },
+                modifier = Modifier
+                    .clip(sheetShape)
+                    .background(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                AirVibeTheme.glass.surfaceFillStrong,
+                                MaterialTheme.colorScheme.surface,
+                            ),
+                        ),
+                    )
+                    .glassShadow(
+                        color = AirVibeTheme.glass.shadowColor,
+                        cornerRadius = 0.dp,
+                    )
+                    .glassBlur(radius = 28.dp, shape = sheetShape)
+                    .fillMaxWidth(),
+            )
         }
     }
 }

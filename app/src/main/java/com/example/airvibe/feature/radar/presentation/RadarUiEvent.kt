@@ -18,4 +18,13 @@ sealed interface RadarUiEvent {
     data object DismissPermissions : RadarUiEvent
     data object SignOut : RadarUiEvent
     data class UpdateOwnProfile(val profile: ScannerProfile) : RadarUiEvent
+
+    /** Abre la bandeja de entrada de chats. */
+    data object OpenChats : RadarUiEvent
+
+    /** Abre el sheet de filtros inteligentes. */
+    data object OpenMatchFilters : RadarUiEvent
+
+    /** Cierra el sheet de filtros inteligentes. */
+    data object DismissMatchFilters : RadarUiEvent
 }

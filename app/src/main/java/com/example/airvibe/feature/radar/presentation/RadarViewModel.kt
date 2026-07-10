@@ -6,6 +6,8 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.airvibe.core.di.ScannerLifecycle
 import com.example.airvibe.core.di.ServiceLocator
+import com.example.airvibe.feature.chat.domain.repository.ChatRepository
+import com.example.airvibe.feature.chat.domain.repository.MatchPreferencesRepository
 import com.example.airvibe.feature.radar.domain.repository.RadarRepository
 import com.example.airvibe.feature.radar.domain.scanner.RadarScanner
 import com.example.airvibe.feature.radar.domain.scanner.ScannerProfile
@@ -23,11 +25,9 @@ import kotlinx.coroutines.launch
  * ViewModel de la pantalla del radar. Sigue el patrón MVVM con
  * exposición de un único [StateFlow] inmutable.
  *
- * La capa de presentación no conoce los detalles del repositorio
- * más allá de la interfaz — el service locator inyecta la
- * dependencia que, en este paso, está respaldada por Room como
- * Single Source of Truth y por Nearby Connections como sensor
- * P2P.
+ * Paso 5: además del radar, observa los criterios de matching
+ * (para alimentar el sheet de filtros) y el conteo de chats
+ * (para mostrar un badge en el botón de "Chats" de la top bar).
  */
 class RadarViewModel(
     private val repository: RadarRepository,
@@ -35,6 +35,8 @@ class RadarViewModel(
     private val scannerLifecycle: ScannerLifecycle,
     private val appContext: Context,
     private val profileProvider: () -> ScannerProfile,
+    private val matchPreferences: MatchPreferencesRepository,
+    private val chatRepository: ChatRepository,
     private val onSignOut: suspend () -> Unit = {},
 ) : ViewModel() {
 
@@ -44,6 +46,8 @@ class RadarViewModel(
     init {
         observeNodes()
         observeScannerState()
+        observeMatchPreferences()
+        observeUnsyncedCount()
     }
 
     private fun observeNodes() {
@@ -87,6 +91,24 @@ class RadarViewModel(
         }
     }
 
+    private fun observeMatchPreferences() {
+        viewModelScope.launch {
+            matchPreferences.observe()
+                .onEach { criteria -> _uiState.update { it.copy(matchCriteria = criteria) } }
+                .collect()
+        }
+    }
+
+    private fun observeUnsyncedCount() {
+        viewModelScope.launch {
+            chatRepository.observeConversations()
+                .onEach { list ->
+                    _uiState.update { it.copy(unreadChatCount = list.size) }
+                }
+                .collect()
+        }
+    }
+
     fun onEvent(event: RadarUiEvent) {
         when (event) {
             is RadarUiEvent.NodeClicked -> showPreview(event.nodeId)
@@ -100,6 +122,9 @@ class RadarViewModel(
             RadarUiEvent.DismissPermissions -> dismissPermissions()
             RadarUiEvent.SignOut -> signOut()
             is RadarUiEvent.UpdateOwnProfile -> updateOwnProfile(event.profile)
+            RadarUiEvent.OpenChats -> Unit
+            RadarUiEvent.OpenMatchFilters -> _uiState.update { it.copy(isMatchFiltersVisible = true) }
+            RadarUiEvent.DismissMatchFilters -> _uiState.update { it.copy(isMatchFiltersVisible = false) }
         }
     }
 
@@ -196,6 +221,8 @@ class RadarViewModel(
         private val scanner: RadarScanner = ServiceLocator.radarScanner,
         private val scannerLifecycle: ScannerLifecycle = ServiceLocator.scannerLifecycle,
         private val profileProvider: () -> ScannerProfile = ServiceLocator.scannerProfileProvider,
+        private val matchPreferences: MatchPreferencesRepository = ServiceLocator.matchPreferencesRepository,
+        private val chatRepository: ChatRepository = ServiceLocator.chatRepository,
         private val onSignOut: suspend () -> Unit = { ServiceLocator.authRepository.signOut() },
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
@@ -209,6 +236,8 @@ class RadarViewModel(
                 scannerLifecycle = scannerLifecycle,
                 appContext = appContext,
                 profileProvider = profileProvider,
+                matchPreferences = matchPreferences,
+                chatRepository = chatRepository,
                 onSignOut = onSignOut,
             ) as T
         }

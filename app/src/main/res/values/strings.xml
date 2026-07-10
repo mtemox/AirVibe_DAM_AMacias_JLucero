@@ -37,4 +37,10 @@
     <string name="scanner_state_advertising">Transmitiendo tu presencia</string>
     <string name="scanner_state_discovering">Buscando contactos cercanos</string>
     <string name="scanner_state_error">Error de radar</string>
+
+    <!-- Match notifications (Paso 5) -->
+    <string name="match_channel_name">Alertas inteligentes</string>
+    <string name="match_channel_description">Te avisamos cuando encontramos un peer cercano que coincide con tus intereses.</string>
+    <string name="match_notification_title">¡Hay un match cerca de ti!</string>
+    <string name="match_notification_body">Se encontró %1$s cerca de ti (coincide con \"%2$s\").</string>
 </resources>

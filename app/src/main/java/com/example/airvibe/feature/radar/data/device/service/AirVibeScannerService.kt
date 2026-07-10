@@ -28,6 +28,9 @@ import kotlinx.coroutines.launch
  *  - Publicar la notificación persistente ("Radar AirVibe activo").
  *  - Reenviar [ACTION_START] / [ACTION_STOP] al scanner a través
  *    del [ServiceLocator].
+ *  - Inicializar el [com.example.airvibe.feature.chat.data.notification.MatchNotificationManager]
+ *    para que las **alertas inteligentes** de matching puedan
+ *    dispararse aunque la app esté en background.
  *  - Detenerse a sí mismo cuando el scanner queda en [ScannerState.Idle].
  *
  * El Service NO contiene la lógica de Nearby: la implementación vive
@@ -45,6 +48,13 @@ class AirVibeScannerService : Service() {
     override fun onCreate() {
         super.onCreate()
         ScannerNotificationFactory.ensureChannel(this)
+        // Aseguramos el canal de matches para que esté listo
+        // antes de que el scanner descubra un peer.
+        com.example.airvibe.feature.chat.data.notification.MatchNotificationManager.ensureChannel(this)
+        // Levantamos el manager de notificaciones de matching.
+        // Se queda observando el SharedFlow del MatchEngine
+        // mientras el service esté vivo.
+        ServiceLocator.startMatchManager()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -124,8 +134,7 @@ class AirVibeScannerService : Service() {
 /**
  * Estado reactivo del Foreground Service, expuesto a través de un
  * [StateFlow] para que la UI pueda mostrar un indicador cuando el
- * service está activo. Hoy se mantiene simple; en el futuro podría
- * contener más métricas (peers descubiertos, batería, etc.).
+ * service está activo.
  */
 object ScannerServiceState {
     private val _isRunning = MutableStateFlow(false)

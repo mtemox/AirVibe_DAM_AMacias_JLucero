@@ -15,8 +15,11 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Bolt
+import androidx.compose.material.icons.rounded.ChatBubbleOutline
 import androidx.compose.material.icons.rounded.Logout
 import androidx.compose.material.icons.rounded.PersonOutline
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -38,7 +41,9 @@ fun RadarTopBar(
     isScanning: Boolean,
     modifier: Modifier = Modifier,
     discoveredPeers: Int = 0,
+    chatCount: Int = 0,
     onSignOut: (() -> Unit)? = null,
+    onOpenChats: (() -> Unit)? = null,
 ) {
     Box(
         modifier = modifier
@@ -122,6 +127,42 @@ fun RadarTopBar(
                             )
                         }
                     }
+
+                    if (onOpenChats != null) {
+                        val tokens = AirVibeTheme.glass
+                        BadgedBox(
+                            badge = {
+                                if (chatCount > 0) {
+                                    Badge(
+                                        containerColor = MaterialTheme.colorScheme.primary,
+                                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                                    ) { Text(chatCount.toString()) }
+                                }
+                            },
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(tokens.surfaceFill)
+                                    .border(
+                                        width = 1.dp,
+                                        color = tokens.outerBorder,
+                                        shape = CircleShape,
+                                    )
+                                    .clickable(onClick = onOpenChats),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.ChatBubbleOutline,
+                                    contentDescription = "Chats",
+                                    tint = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.size(18.dp),
+                                )
+                            }
+                        }
+                    }
+
                     if (onSignOut != null) {
                         val tokens = AirVibeTheme.glass
                         Box(

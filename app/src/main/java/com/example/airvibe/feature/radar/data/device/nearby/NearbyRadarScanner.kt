@@ -4,6 +4,8 @@ import android.content.Context
 import android.util.Log
 import androidx.annotation.RequiresPermission
 import androidx.compose.ui.graphics.Color
+import com.example.airvibe.feature.chat.data.device.nearby.NearbyChatMessageGateway
+import com.example.airvibe.feature.chat.data.notification.MatchEngine
 import com.example.airvibe.feature.radar.domain.repository.RadarRepository
 import com.example.airvibe.feature.radar.domain.scanner.DiscoveredPeer
 import com.example.airvibe.feature.radar.domain.scanner.DistanceLevel
@@ -55,10 +57,16 @@ import kotlinx.coroutines.tasks.await
  *  3. Cada peer se **persiste en Room** vía [RadarRepository]; la UI
  *     se entera gracias al `Flow` reactivo del repositorio.
  *  4. Al desconectarse, el peer se elimina de la base de datos.
+ *
+ * Paso 5: el scanner también enruta los payloads de chat al
+ * [NearbyChatMessageGateway] y notifica al [MatchEngine] para
+ * las alertas inteligentes.
  */
 class NearbyRadarScanner(
     private val context: Context,
     private val repository: RadarRepository,
+    private val chatGateway: NearbyChatMessageGateway? = null,
+    private val matchEngine: MatchEngine? = null,
 ) : RadarScanner {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -75,11 +83,22 @@ class NearbyRadarScanner(
     private var serviceId: String = DEFAULT_SERVICE_ID
 
     private val discoveredEndpointIds = mutableSetOf<String>()
+    private val connectedEndpointIds = mutableSetOf<String>()
 
     private val payloadCallback = object : PayloadCallback() {
         override fun onPayloadReceived(endpointId: String, payload: Payload) {
             if (payload.type != Payload.Type.BYTES) return
             val bytes = payload.asBytes() ?: return
+
+            // Primero intentamos decodificar como payload de chat
+            // (mensaje o invitación). Si lo es, el gateway se
+            // encarga de persistirlo y de enlazar el endpoint con
+            // el nodeId del emisor.
+            val handledByChat = chatGateway?.onIncomingPayload(endpointId, bytes) ?: false
+            if (handledByChat) return
+
+            // Si no era un payload de chat, lo tratamos como
+            // perfil del radar (formato v1 original).
             val profile = NearbyPayloadCodec.decode(bytes) ?: return
             handleDiscoveredProfile(endpointId, profile, distanceLevel = DistanceLevel.UNKNOWN)
         }
@@ -103,6 +122,7 @@ class NearbyRadarScanner(
         override fun onConnectionResult(endpointId: String, result: ConnectionResolution) {
             when (result.status.statusCode) {
                 ConnectionsStatusCodes.STATUS_OK -> {
+                    connectedEndpointIds += endpointId
                     val profile = currentProfile
                     if (profile != null) {
                         val payload = Payload.fromBytes(NearbyPayloadCodec.encode(profile))
@@ -115,7 +135,11 @@ class NearbyRadarScanner(
                 ConnectionsStatusCodes.STATUS_CONNECTION_REJECTED,
                 ConnectionsStatusCodes.STATUS_ERROR -> {
                     discoveredEndpointIds.remove(endpointId)
-                    scope.launch { repository.removeNode(endpointId) }
+                    connectedEndpointIds.remove(endpointId)
+                    scope.launch {
+                        repository.removeNode(endpointId)
+                        chatGateway?.unbindEndpoint(endpointId)
+                    }
                     updateDiscoveredCount()
                 }
             }
@@ -123,7 +147,11 @@ class NearbyRadarScanner(
 
         override fun onDisconnected(endpointId: String) {
             discoveredEndpointIds.remove(endpointId)
-            scope.launch { repository.removeNode(endpointId) }
+            connectedEndpointIds.remove(endpointId)
+            scope.launch {
+                repository.removeNode(endpointId)
+                chatGateway?.unbindEndpoint(endpointId)
+            }
             updateDiscoveredCount()
         }
     }
@@ -138,7 +166,11 @@ class NearbyRadarScanner(
 
         override fun onEndpointLost(endpointId: String) {
             discoveredEndpointIds.remove(endpointId)
-            scope.launch { repository.removeNode(endpointId) }
+            connectedEndpointIds.remove(endpointId)
+            scope.launch {
+                repository.removeNode(endpointId)
+                chatGateway?.unbindEndpoint(endpointId)
+            }
             updateDiscoveredCount()
         }
     }
@@ -167,6 +199,8 @@ class NearbyRadarScanner(
 
             repository.clearDiscoveredNodes()
             discoveredEndpointIds.clear()
+            connectedEndpointIds.clear()
+            matchEngine?.resetDedupe()
             _state.value = ScannerState.Active(discovered = 0)
             true
         } catch (t: Throwable) {
@@ -194,8 +228,13 @@ class NearbyRadarScanner(
         runCatching { connectionsClient.stopAdvertising() }
         runCatching { connectionsClient.stopDiscovery() }
         runCatching { connectionsClient.stopAllEndpoints() }
+        val endpoints = discoveredEndpointIds.toList()
         discoveredEndpointIds.clear()
+        connectedEndpointIds.clear()
         scope.launch { repository.clearDiscoveredNodes() }
+        scope.launch {
+            endpoints.forEach { chatGateway?.unbindEndpoint(it) }
+        }
         _state.value = ScannerState.Idle
     }
 
@@ -219,6 +258,16 @@ class NearbyRadarScanner(
         val accent = colorFor(endpointId)
         val node = peer.toRadarNode(accentColor = accent)
         scope.launch { repository.upsertNode(node) }
+
+        // Vinculamos el endpoint con el nodeId estable para que
+        // el gateway de chat pueda responder mensajes.
+        scope.launch { chatGateway?.bindEndpoint(profile.id, endpointId) }
+
+        // Evaluamos el match contra los criterios activos. Si
+        // coincide, el MatchEngine emite al SharedFlow que
+        // MatchNotificationManager está escuchando.
+        matchEngine?.onPeerDiscovered(profile)
+
         updateDiscoveredCount()
     }
 
@@ -265,6 +314,13 @@ class NearbyRadarScanner(
             .take(24)
         return if (sanitized.isNotEmpty()) "$sanitized.airvibe" else DEFAULT_SERVICE_ID
     }
+
+    /**
+     * Devuelve un snapshot inmutable de los endpoints conectados
+     * en este momento. El [NearbyChatMessageGateway] lo usa para
+     * el broadcast.
+     */
+    fun connectedEndpoints(): Set<String> = connectedEndpointIds.toSet()
 
     companion object {
         private const val TAG = "NearbyRadarScanner"
