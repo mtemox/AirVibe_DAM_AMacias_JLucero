@@ -48,6 +48,8 @@ import com.example.airvibe.core.di.ServiceLocator
 import com.example.airvibe.core.permissions.rememberRadarPermissionsState
 import com.example.airvibe.feature.chat.presentation.components.MatchPreferencesSheet
 import com.example.airvibe.feature.radar.domain.model.RadarNode
+import com.example.airvibe.feature.radar.presentation.components.BroadcastSheet
+import com.example.airvibe.feature.radar.presentation.components.OwnProfileSheet
 import com.example.airvibe.feature.radar.presentation.components.ProfilePreviewContent
 import com.example.airvibe.feature.radar.presentation.components.RadarControlPanel
 import com.example.airvibe.feature.radar.presentation.components.RadarNodeBubble
@@ -65,6 +67,8 @@ fun RadarScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val matchFiltersSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val ownProfileSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val broadcastSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val permissionsState = rememberRadarPermissionsState()
 
     // Si el scanner falla por permisos, abrimos automáticamente el modal.
@@ -73,9 +77,10 @@ fun RadarScreen(
     }
 
     val currentUser by ServiceLocator.authRepository.currentUser.collectAsStateWithLifecycle()
-    val displayName = currentUser?.displayName?.takeIf { it.isNotBlank() }
+    val displayName = state.ownProfile?.displayName?.takeIf { it.isNotBlank() }
+        ?: currentUser?.displayName?.takeIf { it.isNotBlank() }
         ?: currentUser?.email?.substringBefore('@')
-        ?: "Ariel Macias"
+        ?: "Usuario"
 
     Box(modifier = Modifier.fillMaxSize()) {
         AirVibeAmbientBackground()
@@ -93,6 +98,7 @@ fun RadarScreen(
                 chatCount = state.unreadChatCount,
                 onSignOut = { viewModel.onEvent(RadarUiEvent.SignOut) },
                 onOpenChats = onOpenChats,
+                onEditProfile = { viewModel.onEvent(RadarUiEvent.OpenOwnProfile) },
             )
 
             Box(
@@ -102,7 +108,7 @@ fun RadarScreen(
                     .padding(horizontal = 12.dp),
             ) {
                 RadarCanvas(
-                    nodes = state.nodes,
+                    nodes = state.visibleNodes,
                     isScanning = state.isScanning,
                     onNodeClick = { viewModel.onEvent(RadarUiEvent.NodeClicked(it.id)) },
                     modifier = Modifier.fillMaxSize(),
@@ -117,7 +123,7 @@ fun RadarScreen(
             ) {
                 RadarControlPanel(
                     onScanToggle = { viewModel.onEvent(RadarUiEvent.ToggleScan) },
-                    onBroadcast = { viewModel.onEvent(RadarUiEvent.Refresh) },
+                    onBroadcast = { viewModel.onEvent(RadarUiEvent.OpenBroadcast) },
                     onCenter = { viewModel.onEvent(RadarUiEvent.Refresh) },
                     onFilter = { viewModel.onEvent(RadarUiEvent.OpenMatchFilters) },
                     isScanning = state.isScanning,
@@ -153,7 +159,7 @@ fun RadarScreen(
                     accentColor = node.accentColor,
                     onConnect = { onOpenChat(node.id) },
                     onAddContact = { viewModel.onEvent(RadarUiEvent.AddToContacts) },
-                    onToggleFavorite = { viewModel.onEvent(RadarUiEvent.AddToContacts) },
+                    onToggleFavorite = { viewModel.onEvent(RadarUiEvent.ToggleFavorite) },
                     modifier = Modifier
                         .padding(top = 24.dp)
                         .clip(sheetShape)
@@ -189,6 +195,75 @@ fun RadarScreen(
             MatchPreferencesSheet(
                 repository = ServiceLocator.matchPreferencesRepository,
                 onDismiss = { viewModel.onEvent(RadarUiEvent.DismissMatchFilters) },
+                modifier = Modifier
+                    .clip(sheetShape)
+                    .background(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                AirVibeTheme.glass.surfaceFillStrong,
+                                MaterialTheme.colorScheme.surface,
+                            ),
+                        ),
+                    )
+                    .glassShadow(
+                        color = AirVibeTheme.glass.shadowColor,
+                        cornerRadius = 0.dp,
+                    )
+                    .glassBlur(radius = 28.dp, shape = sheetShape)
+                    .fillMaxWidth(),
+            )
+        }
+    }
+
+    if (state.isOwnProfileVisible && state.ownProfile != null) {
+        ModalBottomSheet(
+            onDismissRequest = { viewModel.onEvent(RadarUiEvent.DismissOwnProfile) },
+            sheetState = ownProfileSheetState,
+            containerColor = Color.Transparent,
+            scrimColor = Color.Black.copy(alpha = 0.45f),
+            dragHandle = null,
+        ) {
+            val sheetShape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)
+            OwnProfileSheet(
+                profile = state.ownProfile!!,
+                onSave = { name, status, tags ->
+                    viewModel.onOwnProfileSave(name, status, tags)
+                },
+                onDismiss = { viewModel.onEvent(RadarUiEvent.DismissOwnProfile) },
+                modifier = Modifier
+                    .clip(sheetShape)
+                    .background(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                AirVibeTheme.glass.surfaceFillStrong,
+                                MaterialTheme.colorScheme.surface,
+                            ),
+                        ),
+                    )
+                    .glassShadow(
+                        color = AirVibeTheme.glass.shadowColor,
+                        cornerRadius = 0.dp,
+                    )
+                    .glassBlur(radius = 28.dp, shape = sheetShape)
+                    .fillMaxWidth(),
+            )
+        }
+    }
+
+    if (state.isBroadcastVisible) {
+        ModalBottomSheet(
+            onDismissRequest = { viewModel.onEvent(RadarUiEvent.DismissBroadcast) },
+            sheetState = broadcastSheetState,
+            containerColor = Color.Transparent,
+            scrimColor = Color.Black.copy(alpha = 0.45f),
+            dragHandle = null,
+        ) {
+            val sheetShape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)
+            BroadcastSheet(
+                isBroadcasting = state.isBroadcasting,
+                lastBroadcastCount = state.lastBroadcastCount,
+                onBroadcast = { viewModel.onEvent(RadarUiEvent.SendBroadcast(it)) },
+                onDismiss = { viewModel.onEvent(RadarUiEvent.DismissBroadcast) },
                 modifier = Modifier
                     .clip(sheetShape)
                     .background(

@@ -1,6 +1,7 @@
 package com.example.airvibe.feature.radar.presentation
 
 import com.example.airvibe.feature.chat.domain.model.MatchCriteria
+import com.example.airvibe.feature.radar.data.seed.RadarSeedData
 import com.example.airvibe.feature.radar.domain.model.PersonProfile
 import com.example.airvibe.feature.radar.domain.model.RadarNode
 import com.example.airvibe.feature.radar.domain.scanner.ScannerError
@@ -24,9 +25,24 @@ data class RadarUiState(
     val pendingPermissionRequest: Boolean = false,
     val matchCriteria: MatchCriteria = MatchCriteria(),
     val isMatchFiltersVisible: Boolean = false,
+    val isOwnProfileVisible: Boolean = false,
+    val isBroadcastVisible: Boolean = false,
+    val isBroadcasting: Boolean = false,
+    val lastBroadcastCount: Int = 0,
+    val ownProfile: com.example.airvibe.feature.radar.domain.scanner.ScannerProfile? = null,
     val unreadChatCount: Int = 0,
+    val hideDemoNodes: Boolean = false,
 ) {
-    val hasNodes: Boolean get() = nodes.isNotEmpty()
-    val activeNodeCount: Int get() = nodes.count { it.presence != com.example.airvibe.feature.radar.domain.model.PresenceStatus.Away }
+    val visibleNodes: List<RadarNode>
+        get() = if (hideDemoNodes) {
+            nodes.filterNot { it.id.startsWith(RadarSeedData.SEED_ID_PREFIX) }
+        } else {
+            nodes
+        }
+
+    val hasNodes: Boolean get() = visibleNodes.isNotEmpty()
+    val activeNodeCount: Int get() = visibleNodes.count {
+        it.presence != com.example.airvibe.feature.radar.domain.model.PresenceStatus.Away
+    }
     val scannerError: ScannerError? = (scannerState as? ScannerState.Error)?.reason
 }

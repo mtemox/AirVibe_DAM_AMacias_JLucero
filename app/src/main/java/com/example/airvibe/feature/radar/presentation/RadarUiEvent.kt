@@ -15,9 +15,19 @@ sealed interface RadarUiEvent {
     data object Refresh : RadarUiEvent
     data object Connect : RadarUiEvent
     data object AddToContacts : RadarUiEvent
+    data object ToggleFavorite : RadarUiEvent
     data object DismissPermissions : RadarUiEvent
     data object SignOut : RadarUiEvent
     data class UpdateOwnProfile(val profile: ScannerProfile) : RadarUiEvent
+
+    /** Abre el editor del perfil propio anunciado por Bluetooth. */
+    data object OpenOwnProfile : RadarUiEvent
+    data object DismissOwnProfile : RadarUiEvent
+
+    /** Abre el sheet para enviar broadcast a todos los peers. */
+    data object OpenBroadcast : RadarUiEvent
+    data object DismissBroadcast : RadarUiEvent
+    data class SendBroadcast(val text: String) : RadarUiEvent
 
     /** Abre la bandeja de entrada de chats. */
     data object OpenChats : RadarUiEvent

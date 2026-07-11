@@ -69,9 +69,10 @@ class MatchEngine(
      * variantes sólo se usan para que los tests inspeccionen el
      * flujo sin depender del [SharedFlow].
      */
-    fun onPeerDiscovered(profile: ScannerProfile): MatchResult {
+    fun onPeerDiscovered(profile: ScannerProfile, signalStrength: Float): MatchResult {
         val current = criteria
         if (!current.isActive) return MatchResult.Ignored
+        if (signalStrength < current.minSignal) return MatchResult.Ignored
 
         val matchedKeyword = current.keywords.firstOrNull { keyword ->
             val needle = keyword.trim().lowercase()

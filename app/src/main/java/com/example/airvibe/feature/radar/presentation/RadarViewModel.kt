@@ -6,9 +6,12 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.airvibe.core.di.ScannerLifecycle
 import com.example.airvibe.core.di.ServiceLocator
+import com.example.airvibe.feature.auth.domain.repository.AuthRepository
 import com.example.airvibe.feature.chat.domain.repository.ChatRepository
 import com.example.airvibe.feature.chat.domain.repository.MatchPreferencesRepository
+import com.example.airvibe.feature.radar.data.seed.RadarSeedData
 import com.example.airvibe.feature.radar.domain.repository.RadarRepository
+import com.example.airvibe.feature.radar.domain.repository.ScannerProfileRepository
 import com.example.airvibe.feature.radar.domain.scanner.RadarScanner
 import com.example.airvibe.feature.radar.domain.scanner.ScannerProfile
 import com.example.airvibe.feature.radar.domain.scanner.ScannerState
@@ -21,20 +24,13 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-/**
- * ViewModel de la pantalla del radar. Sigue el patrón MVVM con
- * exposición de un único [StateFlow] inmutable.
- *
- * Paso 5: además del radar, observa los criterios de matching
- * (para alimentar el sheet de filtros) y el conteo de chats
- * (para mostrar un badge en el botón de "Chats" de la top bar).
- */
 class RadarViewModel(
     private val repository: RadarRepository,
     private val scanner: RadarScanner,
     private val scannerLifecycle: ScannerLifecycle,
     private val appContext: Context,
-    private val profileProvider: () -> ScannerProfile,
+    private val profileRepository: ScannerProfileRepository,
+    private val authRepository: AuthRepository,
     private val matchPreferences: MatchPreferencesRepository,
     private val chatRepository: ChatRepository,
     private val onSignOut: suspend () -> Unit = {},
@@ -47,7 +43,9 @@ class RadarViewModel(
         observeNodes()
         observeScannerState()
         observeMatchPreferences()
-        observeUnsyncedCount()
+        observeUnreadChats()
+        observeOwnProfile()
+        syncAuthDisplayName()
     }
 
     private fun observeNodes() {
@@ -78,12 +76,14 @@ class RadarViewModel(
             scanner.state
                 .onEach { scannerState ->
                     val discovered = (scannerState as? ScannerState.Active)?.discovered ?: 0
+                    val isScanning = scannerState is ScannerState.Active ||
+                        scannerState is ScannerState.Starting
                     _uiState.update {
                         it.copy(
                             scannerState = scannerState,
-                            isScanning = scannerState is ScannerState.Active ||
-                                scannerState is ScannerState.Starting,
+                            isScanning = isScanning,
                             discoveredPeers = discovered,
+                            hideDemoNodes = isScanning || discovered > 0,
                         )
                     }
                 }
@@ -99,13 +99,31 @@ class RadarViewModel(
         }
     }
 
-    private fun observeUnsyncedCount() {
+    private fun observeUnreadChats() {
         viewModelScope.launch {
-            chatRepository.observeConversations()
-                .onEach { list ->
-                    _uiState.update { it.copy(unreadChatCount = list.size) }
+            chatRepository.observeUnreadConversationCount()
+                .onEach { count ->
+                    _uiState.update { it.copy(unreadChatCount = count) }
                 }
                 .collect()
+        }
+    }
+
+    private fun observeOwnProfile() {
+        viewModelScope.launch {
+            profileRepository.observe()
+                .onEach { profile ->
+                    _uiState.update { it.copy(ownProfile = profile) }
+                }
+                .collect()
+        }
+    }
+
+    private fun syncAuthDisplayName() {
+        viewModelScope.launch {
+            authRepository.currentUser.collect { user ->
+                profileRepository.applyAuthDisplayName(user?.displayName)
+            }
         }
     }
 
@@ -119,16 +137,25 @@ class RadarViewModel(
             RadarUiEvent.Refresh -> refresh()
             RadarUiEvent.Connect -> connect()
             RadarUiEvent.AddToContacts -> addToContacts()
+            RadarUiEvent.ToggleFavorite -> toggleFavorite()
             RadarUiEvent.DismissPermissions -> dismissPermissions()
             RadarUiEvent.SignOut -> signOut()
             is RadarUiEvent.UpdateOwnProfile -> updateOwnProfile(event.profile)
             RadarUiEvent.OpenChats -> Unit
             RadarUiEvent.OpenMatchFilters -> _uiState.update { it.copy(isMatchFiltersVisible = true) }
             RadarUiEvent.DismissMatchFilters -> _uiState.update { it.copy(isMatchFiltersVisible = false) }
+            RadarUiEvent.OpenOwnProfile -> _uiState.update { it.copy(isOwnProfileVisible = true) }
+            RadarUiEvent.DismissOwnProfile -> _uiState.update { it.copy(isOwnProfileVisible = false) }
+            RadarUiEvent.OpenBroadcast -> _uiState.update { it.copy(isBroadcastVisible = true) }
+            RadarUiEvent.DismissBroadcast -> _uiState.update {
+                it.copy(isBroadcastVisible = false, lastBroadcastCount = 0)
+            }
+            is RadarUiEvent.SendBroadcast -> sendBroadcast(event.text)
         }
     }
 
     private fun showPreview(nodeId: String) {
+        if (nodeId.startsWith(RadarSeedData.SEED_ID_PREFIX) && _uiState.value.hideDemoNodes) return
         val node = _uiState.value.nodes.firstOrNull { it.id == nodeId } ?: return
         viewModelScope.launch {
             val profile = repository.getProfile(nodeId)
@@ -164,7 +191,7 @@ class RadarViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(pendingPermissionRequest = false) }
             scannerLifecycle.execute(ScannerLifecycle.Action.Start)
-            val started = scanner.start(profileProvider())
+            val started = scanner.start(profileRepository.current())
             if (!started) {
                 _uiState.update { it.copy(pendingPermissionRequest = true) }
             }
@@ -187,7 +214,7 @@ class RadarViewModel(
     }
 
     private fun connect() {
-        // Hook reservado para el paso 4 (establecer conexión P2P activa).
+        // La navegación al chat la resuelve RadarScreen vía onOpenChat.
     }
 
     private fun addToContacts() {
@@ -197,30 +224,59 @@ class RadarViewModel(
         }
     }
 
+    private fun toggleFavorite() {
+        addToContacts()
+    }
+
     private fun updateOwnProfile(profile: ScannerProfile) {
         viewModelScope.launch { scanner.updateProfile(profile) }
     }
 
+    private fun saveOwnProfile(displayName: String, status: String, tags: List<String>) {
+        viewModelScope.launch {
+            profileRepository.update(displayName, status, tags)
+            val updated = profileRepository.current()
+            scanner.updateProfile(updated)
+            if (_uiState.value.isScanning) {
+                scanner.stop()
+                scanner.start(updated)
+            }
+            _uiState.update { it.copy(isOwnProfileVisible = false) }
+        }
+    }
+
+    private fun sendBroadcast(text: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isBroadcasting = true) }
+            val count = runCatching { chatRepository.broadcast(text) }.getOrDefault(0)
+            _uiState.update {
+                it.copy(
+                    isBroadcasting = false,
+                    lastBroadcastCount = count,
+                )
+            }
+        }
+    }
+
+    fun onOwnProfileSave(displayName: String, status: String, tags: List<String>) {
+        saveOwnProfile(displayName, status, tags)
+    }
+
     private fun signOut() {
         viewModelScope.launch {
-            // Detenemos el radar antes de cerrar sesión para no
-            // seguir publicando presencia.
             scanner.stop()
             scannerLifecycle.execute(ScannerLifecycle.Action.Stop)
             onSignOut()
         }
     }
 
-    /**
-     * Factory parametrizable. El [appContext] debe ser el contexto
-     * de la aplicación (evita leaks de Activity).
-     */
     class Factory(
         private val appContext: Context,
         private val repository: RadarRepository = ServiceLocator.radarRepository,
         private val scanner: RadarScanner = ServiceLocator.radarScanner,
         private val scannerLifecycle: ScannerLifecycle = ServiceLocator.scannerLifecycle,
-        private val profileProvider: () -> ScannerProfile = ServiceLocator.scannerProfileProvider,
+        private val profileRepository: ScannerProfileRepository = ServiceLocator.scannerProfileRepository,
+        private val authRepository: AuthRepository = ServiceLocator.authRepository,
         private val matchPreferences: MatchPreferencesRepository = ServiceLocator.matchPreferencesRepository,
         private val chatRepository: ChatRepository = ServiceLocator.chatRepository,
         private val onSignOut: suspend () -> Unit = { ServiceLocator.authRepository.signOut() },
@@ -235,7 +291,8 @@ class RadarViewModel(
                 scanner = scanner,
                 scannerLifecycle = scannerLifecycle,
                 appContext = appContext,
-                profileProvider = profileProvider,
+                profileRepository = profileRepository,
+                authRepository = authRepository,
                 matchPreferences = matchPreferences,
                 chatRepository = chatRepository,
                 onSignOut = onSignOut,

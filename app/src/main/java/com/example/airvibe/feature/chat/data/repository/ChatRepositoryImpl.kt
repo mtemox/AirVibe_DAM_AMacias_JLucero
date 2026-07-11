@@ -53,6 +53,9 @@ class ChatRepositoryImpl(
 
     override fun observeUnsyncedCount(): Flow<Int> = chatDao.observeUnsyncedCount()
 
+    override fun observeUnreadConversationCount(): Flow<Int> =
+        chatDao.observeUnreadConversationCount()
+
     override suspend fun sendMessage(peerNodeId: String, text: String): ChatMessage {
         val trimmed = text.trim()
         require(trimmed.isNotEmpty()) { "sendMessage: text cannot be blank" }

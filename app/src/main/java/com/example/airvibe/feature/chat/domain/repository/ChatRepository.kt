@@ -30,6 +30,9 @@ interface ChatRepository {
      */
     fun observeConversations(): Flow<List<ConversationSummary>>
 
+    /** Conversaciones cuya última actividad fue un mensaje entrante. */
+    fun observeUnreadConversationCount(): Flow<Int>
+
     /**
      * Cantidad de mensajes pendientes de sincronizar con la nube.
      * Hoy sólo se reportan como métrica; en el futuro se podrían

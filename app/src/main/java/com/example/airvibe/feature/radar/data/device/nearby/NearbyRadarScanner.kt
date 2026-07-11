@@ -84,6 +84,7 @@ class NearbyRadarScanner(
 
     private val discoveredEndpointIds = mutableSetOf<String>()
     private val connectedEndpointIds = mutableSetOf<String>()
+    private val endpointDistance = mutableMapOf<String, DistanceLevel>()
 
     private val payloadCallback = object : PayloadCallback() {
         override fun onPayloadReceived(endpointId: String, payload: Payload) {
@@ -100,7 +101,9 @@ class NearbyRadarScanner(
             // Si no era un payload de chat, lo tratamos como
             // perfil del radar (formato v1 original).
             val profile = NearbyPayloadCodec.decode(bytes) ?: return
-            handleDiscoveredProfile(endpointId, profile, distanceLevel = DistanceLevel.UNKNOWN)
+            val distance = endpointDistance[endpointId]
+                ?: ProximityDistanceEstimator.estimate(endpointId)
+            handleDiscoveredProfile(endpointId, profile, distanceLevel = distance)
         }
 
         override fun onPayloadTransferUpdate(
@@ -160,6 +163,7 @@ class NearbyRadarScanner(
         override fun onEndpointFound(endpointId: String, info: DiscoveredEndpointInfo) {
             if (info.serviceId != serviceId) return
             discoveredEndpointIds += endpointId
+            endpointDistance[endpointId] = ProximityDistanceEstimator.onEndpointFound(endpointId)
             connectionsClient.requestConnection(LOCAL_ENDPOINT_NAME, endpointId, connectionCallback)
                 .addOnFailureListener { Log.w(TAG, "requestConnection failed: ${it.message}") }
         }
@@ -167,6 +171,8 @@ class NearbyRadarScanner(
         override fun onEndpointLost(endpointId: String) {
             discoveredEndpointIds.remove(endpointId)
             connectedEndpointIds.remove(endpointId)
+            endpointDistance.remove(endpointId)
+            ProximityDistanceEstimator.onEndpointLost(endpointId)
             scope.launch {
                 repository.removeNode(endpointId)
                 chatGateway?.unbindEndpoint(endpointId)
@@ -182,7 +188,9 @@ class NearbyRadarScanner(
         }
         _state.value = ScannerState.Starting
         currentProfile = profile
-        serviceId = computeServiceId(profile.id)
+        // Todos los dispositivos deben compartir el mismo serviceId
+        // para descubrirse; el perfil único viaja en el payload.
+        serviceId = DEFAULT_SERVICE_ID
 
         val advertisingOptions = AdvertisingOptions.Builder().setStrategy(STRATEGY).build()
         val discoveryOptions = DiscoveryOptions.Builder().setStrategy(STRATEGY).build()
@@ -200,6 +208,8 @@ class NearbyRadarScanner(
             repository.clearDiscoveredNodes()
             discoveredEndpointIds.clear()
             connectedEndpointIds.clear()
+            endpointDistance.clear()
+            ProximityDistanceEstimator.reset()
             matchEngine?.resetDedupe()
             _state.value = ScannerState.Active(discovered = 0)
             true
@@ -219,9 +229,11 @@ class NearbyRadarScanner(
     @RequiresPermission(allOf = [android.Manifest.permission.BLUETOOTH_ADVERTISE])
     override suspend fun updateProfile(profile: ScannerProfile) {
         currentProfile = profile
-        // En pasos futuros podemos reenviar el payload a todos
-        // los endpoints conectados. Por ahora basta con guardar
-        // la referencia para los próximos `sendPayload`.
+        val payload = Payload.fromBytes(NearbyPayloadCodec.encode(profile))
+        connectedEndpointIds.forEach { endpointId ->
+            connectionsClient.sendPayload(endpointId, payload)
+                .addOnFailureListener { Log.w(TAG, "updateProfile sendPayload failed: ${it.message}") }
+        }
     }
 
     private fun stopInternal() {
@@ -266,7 +278,7 @@ class NearbyRadarScanner(
         // Evaluamos el match contra los criterios activos. Si
         // coincide, el MatchEngine emite al SharedFlow que
         // MatchNotificationManager está escuchando.
-        matchEngine?.onPeerDiscovered(profile)
+        matchEngine?.onPeerDiscovered(profile, signalStrength = signal)
 
         updateDiscoveredCount()
     }
@@ -304,15 +316,6 @@ class NearbyRadarScanner(
         )
         val index = (endpointId.hashCode().toLong() and 0x7FFFFFFF).toInt() % palette.size
         return palette[index]
-    }
-
-    private fun computeServiceId(profileId: String): String {
-        // Nearby Connections exige un serviceId de máximo 32 bytes
-        // y solo letras minúsculas, dígitos, '_' o '.'.
-        val sanitized = profileId.lowercase()
-            .filter { it.isLetterOrDigit() || it == '_' || it == '.' }
-            .take(24)
-        return if (sanitized.isNotEmpty()) "$sanitized.airvibe" else DEFAULT_SERVICE_ID
     }
 
     /**

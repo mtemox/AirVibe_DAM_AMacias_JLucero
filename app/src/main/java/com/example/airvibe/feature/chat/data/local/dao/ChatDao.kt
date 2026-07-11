@@ -56,6 +56,21 @@ interface ChatDao {
     )
     fun observeConversationSummaries(): Flow<List<ConversationSummaryRow>>
 
+    /** Conversaciones cuya última actividad fue un mensaje entrante. */
+    @Query(
+        """
+        SELECT COUNT(*) FROM chat_messages m
+        INNER JOIN (
+            SELECT node_id, MAX(created_at) AS max_ts
+            FROM chat_messages
+            GROUP BY node_id
+        ) latest
+            ON latest.node_id = m.node_id AND latest.max_ts = m.created_at
+        WHERE m.direction = 'Incoming'
+        """,
+    )
+    fun observeUnreadConversationCount(): Flow<Int>
+
     /** Conteo total de mensajes pendientes de sincronizar. */
     @Query("SELECT COUNT(*) FROM chat_messages WHERE is_synced = 0")
     fun observeUnsyncedCount(): Flow<Int>

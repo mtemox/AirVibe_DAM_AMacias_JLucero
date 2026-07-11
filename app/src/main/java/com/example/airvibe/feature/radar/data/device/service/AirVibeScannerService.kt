@@ -143,17 +143,3 @@ object ScannerServiceState {
     fun markRunning() { _isRunning.value = true }
     fun markStopped() { _isRunning.value = false }
 }
-
-/**
- * Perfil por defecto que la app anuncia. En pasos siguientes se
- * permitirá que el usuario edite su nombre, estado y etiquetas.
- */
-object DefaultScannerProfile {
-    val profile: ScannerProfile = ScannerProfile(
-        id = "airvibe-local-user",
-        displayName = "Tú",
-        status = "Disponible en el radar",
-        kind = com.example.airvibe.feature.radar.domain.model.RadarNodeKind.Person,
-        tags = listOf("AirVibe", "Beta"),
-    )
-}

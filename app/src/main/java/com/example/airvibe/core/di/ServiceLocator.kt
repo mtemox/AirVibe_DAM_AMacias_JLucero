@@ -12,17 +12,19 @@ import com.example.airvibe.feature.chat.data.repository.MatchPreferencesReposito
 import com.example.airvibe.feature.chat.domain.repository.ChatRepository
 import com.example.airvibe.feature.chat.domain.repository.MatchPreferencesRepository
 import com.example.airvibe.feature.chat.domain.scanner.ChatMessageGateway
+import com.example.airvibe.feature.radar.data.device.identity.DeviceIdentityProvider
 import com.example.airvibe.feature.radar.data.device.nearby.NearbyRadarScanner
 import com.example.airvibe.feature.radar.data.device.service.AirVibeScannerService
-import com.example.airvibe.feature.radar.data.device.service.DefaultScannerProfile
 import com.example.airvibe.feature.radar.data.local.dao.RadarDao
 import com.example.airvibe.feature.radar.data.local.database.AirVibeDatabase
 import com.example.airvibe.feature.radar.data.remote.SupabaseNodeDataSource
 import com.example.airvibe.feature.radar.data.repository.RadarRepositoryImpl
+import com.example.airvibe.feature.radar.data.repository.ScannerProfileRepositoryImpl
 import com.example.airvibe.feature.radar.data.sync.AirVibeWorkManagerConfiguration
 import com.example.airvibe.feature.radar.data.sync.SyncScheduler
 import com.example.airvibe.feature.radar.domain.remote.RemoteNodeDataSource
 import com.example.airvibe.feature.radar.domain.repository.RadarRepository
+import com.example.airvibe.feature.radar.domain.repository.ScannerProfileRepository
 import com.example.airvibe.feature.radar.domain.scanner.RadarScanner
 import com.example.airvibe.feature.radar.domain.scanner.ScannerProfile
 import io.github.jan.supabase.SupabaseClient
@@ -91,7 +93,18 @@ object ServiceLocator {
         )
     }
 
-    val scannerProfileProvider: () -> ScannerProfile = { DefaultScannerProfile.profile }
+    val deviceIdentityProvider: DeviceIdentityProvider by lazy {
+        DeviceIdentityProvider(requireNotNull(appContext) { "ServiceLocator.init(context) required." })
+    }
+
+    val scannerProfileRepository: ScannerProfileRepository by lazy {
+        ScannerProfileRepositoryImpl(
+            context = requireNotNull(appContext) { "ServiceLocator.init(context) required." },
+            deviceIdentity = deviceIdentityProvider,
+        )
+    }
+
+    val scannerProfileProvider: () -> ScannerProfile = { scannerProfileRepository.current() }
 
     val matchPreferencesRepository: MatchPreferencesRepository by lazy {
         requireNotNull(appContext) {

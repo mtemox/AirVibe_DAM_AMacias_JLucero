@@ -44,6 +44,7 @@ fun RadarTopBar(
     chatCount: Int = 0,
     onSignOut: (() -> Unit)? = null,
     onOpenChats: (() -> Unit)? = null,
+    onEditProfile: (() -> Unit)? = null,
 ) {
     Box(
         modifier = modifier
@@ -69,6 +70,11 @@ fun RadarTopBar(
                         AvatarMonogram(
                             name = userName,
                             size = 38.dp,
+                            modifier = if (onEditProfile != null) {
+                                Modifier.clickable(onClick = onEditProfile)
+                            } else {
+                                Modifier
+                            },
                         )
                         Box(
                             modifier = Modifier
