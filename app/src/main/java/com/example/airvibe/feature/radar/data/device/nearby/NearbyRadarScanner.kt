@@ -6,6 +6,9 @@ import androidx.annotation.RequiresPermission
 import androidx.compose.ui.graphics.Color
 import com.example.airvibe.feature.chat.data.device.nearby.NearbyChatMessageGateway
 import com.example.airvibe.feature.chat.data.notification.MatchEngine
+import com.example.airvibe.feature.radar.domain.model.PresenceStatus
+import com.example.airvibe.feature.radar.domain.model.RadarNode
+import com.example.airvibe.feature.radar.domain.model.RadarNodeKind
 import com.example.airvibe.feature.radar.domain.repository.RadarRepository
 import com.example.airvibe.feature.radar.domain.scanner.DiscoveredPeer
 import com.example.airvibe.feature.radar.domain.scanner.DistanceLevel
@@ -33,6 +36,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -75,6 +79,9 @@ class NearbyRadarScanner(
     private val _state = MutableStateFlow<ScannerState>(ScannerState.Idle)
     override val state: StateFlow<ScannerState> = _state.asStateFlow()
 
+    private val _liveNodes = MutableStateFlow<List<RadarNode>>(emptyList())
+    override val liveNodes: StateFlow<List<RadarNode>> = _liveNodes.asStateFlow()
+
     private val connectionsClient: ConnectionsClient by lazy {
         Nearby.getConnectionsClient(context)
     }
@@ -85,6 +92,8 @@ class NearbyRadarScanner(
     private val discoveredEndpointIds = mutableSetOf<String>()
     private val connectedEndpointIds = mutableSetOf<String>()
     private val endpointDistance = mutableMapOf<String, DistanceLevel>()
+    private val endpointToNodeId = mutableMapOf<String, String>()
+    private val confirmedProfileIds = mutableSetOf<String>()
 
     private val payloadCallback = object : PayloadCallback() {
         override fun onPayloadReceived(endpointId: String, payload: Payload) {
@@ -140,7 +149,7 @@ class NearbyRadarScanner(
                     discoveredEndpointIds.remove(endpointId)
                     connectedEndpointIds.remove(endpointId)
                     scope.launch {
-                        repository.removeNode(endpointId)
+                        removeEndpointNode(endpointId)
                         chatGateway?.unbindEndpoint(endpointId)
                     }
                     updateDiscoveredCount()
@@ -152,7 +161,7 @@ class NearbyRadarScanner(
             discoveredEndpointIds.remove(endpointId)
             connectedEndpointIds.remove(endpointId)
             scope.launch {
-                repository.removeNode(endpointId)
+                removeEndpointNode(endpointId)
                 chatGateway?.unbindEndpoint(endpointId)
             }
             updateDiscoveredCount()
@@ -162,10 +171,12 @@ class NearbyRadarScanner(
     private val endpointCallback = object : EndpointDiscoveryCallback() {
         override fun onEndpointFound(endpointId: String, info: DiscoveredEndpointInfo) {
             if (info.serviceId != serviceId) return
+            if (endpointId in discoveredEndpointIds) return
             discoveredEndpointIds += endpointId
             endpointDistance[endpointId] = ProximityDistanceEstimator.onEndpointFound(endpointId)
             connectionsClient.requestConnection(LOCAL_ENDPOINT_NAME, endpointId, connectionCallback)
                 .addOnFailureListener { Log.w(TAG, "requestConnection failed: ${it.message}") }
+            updateDiscoveredCount()
         }
 
         override fun onEndpointLost(endpointId: String) {
@@ -174,7 +185,7 @@ class NearbyRadarScanner(
             endpointDistance.remove(endpointId)
             ProximityDistanceEstimator.onEndpointLost(endpointId)
             scope.launch {
-                repository.removeNode(endpointId)
+                removeEndpointNode(endpointId)
                 chatGateway?.unbindEndpoint(endpointId)
             }
             updateDiscoveredCount()
@@ -206,10 +217,14 @@ class NearbyRadarScanner(
             connectionsClient.startDiscovery(serviceId, endpointCallback, discoveryOptions).await()
 
             repository.clearDiscoveredNodes()
+            repository.removePendingNodes()
             discoveredEndpointIds.clear()
             connectedEndpointIds.clear()
             endpointDistance.clear()
+            endpointToNodeId.clear()
+            confirmedProfileIds.clear()
             ProximityDistanceEstimator.reset()
+            _liveNodes.value = emptyList()
             matchEngine?.resetDedupe()
             _state.value = ScannerState.Active(discovered = 0)
             true
@@ -243,7 +258,11 @@ class NearbyRadarScanner(
         val endpoints = discoveredEndpointIds.toList()
         discoveredEndpointIds.clear()
         connectedEndpointIds.clear()
+        endpointToNodeId.clear()
+        confirmedProfileIds.clear()
+        _liveNodes.value = emptyList()
         scope.launch { repository.clearDiscoveredNodes() }
+        scope.launch { repository.removePendingNodes() }
         scope.launch {
             endpoints.forEach { chatGateway?.unbindEndpoint(it) }
         }
@@ -260,6 +279,18 @@ class NearbyRadarScanner(
         profile: ScannerProfile,
         distanceLevel: DistanceLevel,
     ) {
+        if (profile.id == currentProfile?.id) return
+
+        if (profile.id in confirmedProfileIds) {
+            endpointToNodeId[endpointId] = profile.id
+            scope.launch {
+                repository.removePendingNodes()
+                chatGateway?.bindEndpoint(profile.id, endpointId)
+            }
+            updateDiscoveredCount()
+            return
+        }
+
         val signal = DiscoveredPeer.signalFor(distanceLevel)
         val peer = DiscoveredPeer(
             endpointId = endpointId,
@@ -269,7 +300,13 @@ class NearbyRadarScanner(
         )
         val accent = colorFor(endpointId)
         val node = peer.toRadarNode(accentColor = accent)
-        scope.launch { repository.upsertNode(node) }
+        confirmedProfileIds += profile.id
+        replaceLiveNode(endpointId, node)
+        scope.launch {
+            purgePendingNodes()
+            repository.upsertNode(node)
+            endpointToNodeId[endpointId] = profile.id
+        }
 
         // Vinculamos el endpoint con el nodeId estable para que
         // el gateway de chat pueda responder mensajes.
@@ -283,15 +320,86 @@ class NearbyRadarScanner(
         updateDiscoveredCount()
     }
 
+    fun ensurePeerNode(nodeId: String, endpointId: String) {
+        if (nodeId in confirmedProfileIds) {
+            endpointToNodeId[endpointId] = nodeId
+            return
+        }
+        val distance = endpointDistance[endpointId] ?: DistanceLevel.UNKNOWN
+        val signal = DiscoveredPeer.signalFor(distance)
+        val angle = (nodeId.hashCode().toLong() and 0xFFFFFFFFL)
+            .let { ((it % 360).toInt()).toFloat() }
+            .coerceIn(0f, 359.9f)
+        val node = RadarNode(
+            id = nodeId,
+            displayName = "Usuario cercano",
+            status = "Disponible por proximidad",
+            detail = "Perfil recibido por conexión local",
+            kind = RadarNodeKind.Person,
+            presence = PresenceStatus.Online,
+            angleDegrees = angle,
+            distanceNormalized = distance.normalized,
+            signalStrength = signal,
+            accentColor = colorFor(endpointId),
+        )
+        confirmedProfileIds += nodeId
+        endpointToNodeId[endpointId] = nodeId
+        replaceLiveNode(endpointId, node)
+        scope.launch {
+            purgePendingNodes()
+            repository.upsertNode(node)
+        }
+    }
+
+    private fun replaceLiveNode(endpointId: String, node: RadarNode) {
+        _liveNodes.update { current ->
+            (current
+                .filterNot { it.id == pendingNodeId(endpointId) || it.id == node.id }
+                .filterNot { stalePendingForProfile(it.id, node.id) }) + node
+        }
+    }
+
+    private fun stalePendingForProfile(existingId: String, profileId: String): Boolean {
+        return existingId.startsWith("pending-") && endpointToNodeId.values.contains(profileId)
+    }
+
+    private suspend fun purgePendingNodes() {
+        _liveNodes.update { current -> current.filterNot { it.id.startsWith("pending-") } }
+        repository.removePendingNodes()
+    }
+
+    private fun removeLiveNode(endpointId: String) {
+        val nodeId = endpointToNodeId[endpointId] ?: pendingNodeId(endpointId)
+        confirmedProfileIds.remove(nodeId)
+        _liveNodes.update { current ->
+            current.filterNot { it.id == nodeId || it.id == pendingNodeId(endpointId) }
+        }
+    }
+
+    private suspend fun removeEndpointNode(endpointId: String) {
+        val nodeId = endpointToNodeId.remove(endpointId)
+        if (nodeId != null) {
+            confirmedProfileIds.remove(nodeId)
+            _liveNodes.update { current -> current.filterNot { it.id == nodeId } }
+            repository.removeNode(nodeId)
+        }
+        repository.removeNode(pendingNodeId(endpointId))
+    }
+
+    private fun pendingNodeId(endpointId: String) = "pending-$endpointId"
+
     private fun updateDiscoveredCount() {
         val current = _state.value
         if (current is ScannerState.Active) {
-            _state.value = current.copy(discovered = discoveredEndpointIds.size)
+            _state.value = current.copy(discovered = confirmedProfileIds.size)
         }
     }
 
     private fun mapError(t: Throwable): ScannerError = when {
-        t.message?.contains("permission", ignoreCase = true) == true ->
+        t.message?.contains("permission", ignoreCase = true) == true ||
+            t.message?.contains("MISSING_PERMISSION", ignoreCase = true) == true ->
+            ScannerError.MissingPermissions
+        t.message?.contains("wifi", ignoreCase = true) == true ->
             ScannerError.MissingPermissions
         t.message?.contains("bluetooth", ignoreCase = true) == true ->
             ScannerError.BluetoothUnavailable

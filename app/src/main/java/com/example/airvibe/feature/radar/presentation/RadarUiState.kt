@@ -32,6 +32,7 @@ data class RadarUiState(
     val ownProfile: com.example.airvibe.feature.radar.domain.scanner.ScannerProfile? = null,
     val unreadChatCount: Int = 0,
     val hideDemoNodes: Boolean = false,
+    val liveNodes: List<RadarNode> = emptyList(),
 ) {
     val visibleNodes: List<RadarNode>
         get() = if (hideDemoNodes) {
@@ -40,9 +41,25 @@ data class RadarUiState(
             nodes
         }
 
-    val hasNodes: Boolean get() = visibleNodes.isNotEmpty()
-    val activeNodeCount: Int get() = visibleNodes.count {
+    /** Nodos que se dibujan en el radar: memoria del scanner + Room. */
+    val displayNodes: List<RadarNode>
+        get() {
+            val ownId = ownProfile?.id
+            val merged = linkedMapOf<String, RadarNode>()
+            liveNodes.forEach { merged[it.id] = it }
+            visibleNodes.forEach { merged[it.id] = it }
+            return merged.values
+                .filter { ownId == null || it.id != ownId }
+                .filterNot { it.id.startsWith("pending-") }
+                .filterNot { hideDemoNodes && it.id.startsWith(RadarSeedData.SEED_ID_PREFIX) }
+                .toList()
+        }
+
+    val hasNodes: Boolean get() = displayNodes.isNotEmpty()
+    val activeNodeCount: Int get() = displayNodes.count {
         it.presence != com.example.airvibe.feature.radar.domain.model.PresenceStatus.Away
     }
+    /** Conteo visible en la barra: nodos persistidos o endpoints en descubrimiento. */
+    val proximityCount: Int get() = maxOf(activeNodeCount, discoveredPeers)
     val scannerError: ScannerError? = (scannerState as? ScannerState.Error)?.reason
 }

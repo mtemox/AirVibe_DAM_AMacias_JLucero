@@ -15,7 +15,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -32,6 +35,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -66,10 +70,11 @@ import com.example.airvibe.core.permissions.RadarPermissionsState
 fun PermissionsModal(
     state: RadarPermissionsState,
     onDismiss: () -> Unit,
+    visible: Boolean = !state.allGranted,
     modifier: Modifier = Modifier,
 ) {
     AnimatedVisibility(
-        visible = !state.allGranted,
+        visible = visible && !state.allGranted,
         enter = fadeIn() + slideInVertically(initialOffsetY = { it / 4 }),
         exit = fadeOut() + slideOutVertically(targetOffsetY = { it / 4 }),
     ) {
@@ -106,9 +111,12 @@ private fun PermissionsCard(
     onDismiss: () -> Unit,
 ) {
     val tokens = AirVibeTheme.glass
+    val scrollState = rememberScrollState()
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .heightIn(max = 520.dp)
+            .verticalScroll(scrollState)
             .glassShadow(
                 color = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
                 cornerRadius = 32.dp,

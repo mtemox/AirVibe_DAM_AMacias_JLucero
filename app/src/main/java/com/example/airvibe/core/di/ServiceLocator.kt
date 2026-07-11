@@ -143,6 +143,13 @@ object ServiceLocator {
             chatRepository = chatRepositoryImpl,
             localUserIdProvider = { scannerProfileProvider().id },
             connectedEndpointsProvider = { radarScannerConnectedEndpoints() },
+            radarRepository = radarRepository,
+            onPeerBound = { nodeId, endpointId ->
+                val scanner = radarScanner
+                if (scanner is NearbyRadarScanner) {
+                    scanner.ensurePeerNode(nodeId, endpointId)
+                }
+            },
         )
     }
 

@@ -9,6 +9,7 @@ import android.os.IBinder
 import android.util.Log
 import androidx.core.content.ContextCompat
 import com.example.airvibe.core.di.ServiceLocator
+import com.example.airvibe.feature.chat.data.notification.MatchNotificationManager
 import com.example.airvibe.feature.radar.domain.scanner.RadarScanner
 import com.example.airvibe.feature.radar.domain.scanner.ScannerProfile
 import com.example.airvibe.feature.radar.domain.scanner.ScannerState
@@ -47,14 +48,9 @@ class AirVibeScannerService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        ScannerNotificationFactory.ensureChannel(this)
-        // Aseguramos el canal de matches para que esté listo
-        // antes de que el scanner descubra un peer.
-        com.example.airvibe.feature.chat.data.notification.MatchNotificationManager.ensureChannel(this)
-        // Levantamos el manager de notificaciones de matching.
-        // Se queda observando el SharedFlow del MatchEngine
-        // mientras el service esté vivo.
-        ServiceLocator.startMatchManager()
+        runCatching { ScannerNotificationFactory.ensureChannel(this) }
+        runCatching { MatchNotificationManager.ensureChannel(this) }
+        runCatching { ServiceLocator.startMatchManager() }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -72,11 +68,20 @@ class AirVibeScannerService : Service() {
     }
 
     private fun handleStart() {
-        startInForeground(paused = false)
+        try {
+            startInForeground(paused = false)
+        } catch (e: SecurityException) {
+            Log.e(TAG, "Foreground service start denied", e)
+            stopSelf()
+            return
+        }
         scope.launch {
             val scanner: RadarScanner = ServiceLocator.radarScanner
             val profile = ServiceLocator.scannerProfileProvider()
-            scanner.start(profile)
+            val started = scanner.start(profile)
+            if (!started) {
+                handleStop()
+            }
         }
     }
 
@@ -121,12 +126,22 @@ class AirVibeScannerService : Service() {
 
         fun start(context: Context) {
             val intent = Intent(context, AirVibeScannerService::class.java).setAction(ACTION_START)
-            ContextCompat.startForegroundService(context, intent)
+            try {
+                ContextCompat.startForegroundService(context, intent)
+            } catch (e: SecurityException) {
+                Log.e(TAG, "Cannot start foreground service — missing permissions", e)
+            } catch (e: IllegalStateException) {
+                Log.e(TAG, "Cannot start foreground service", e)
+            }
         }
 
         fun stop(context: Context) {
             val intent = Intent(context, AirVibeScannerService::class.java).setAction(ACTION_STOP)
-            context.startService(intent)
+            try {
+                context.startService(intent)
+            } catch (e: IllegalStateException) {
+                Log.e(TAG, "Cannot stop scanner service", e)
+            }
         }
     }
 }

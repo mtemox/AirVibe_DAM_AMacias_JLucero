@@ -31,7 +31,12 @@
     <string name="permission_title_wifi">Dispositivos Wi-Fi cercanos</string>
     <string name="permission_title_notifications">Notificaciones</string>
 
-    <!-- Scanner states -->
+    <!-- Control panel -->
+    <string name="radar_control_scan_start">Iniciar escaneo</string>
+    <string name="radar_control_scan_stop">Detener escaneo</string>
+    <string name="radar_control_broadcast">Broadcast</string>
+    <string name="radar_control_filters">Filtros</string>
+    <string name="radar_control_scan_hint">El primer botón activa o pausa el radar Bluetooth</string>
     <string name="scanner_state_idle">En pausa</string>
     <string name="scanner_state_starting">Iniciando radar…</string>
     <string name="scanner_state_advertising">Transmitiendo tu presencia</string>

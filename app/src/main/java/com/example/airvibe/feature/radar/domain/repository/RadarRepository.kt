@@ -44,4 +44,7 @@ interface RadarRepository {
      * cuando se inicia una nueva sesión de discovery.
      */
     suspend fun clearDiscoveredNodes()
+
+    /** Elimina nodos placeholder creados durante la conexión inicial. */
+    suspend fun removePendingNodes()
 }

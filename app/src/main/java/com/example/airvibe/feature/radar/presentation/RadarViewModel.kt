@@ -10,6 +10,8 @@ import com.example.airvibe.feature.auth.domain.repository.AuthRepository
 import com.example.airvibe.feature.chat.domain.repository.ChatRepository
 import com.example.airvibe.feature.chat.domain.repository.MatchPreferencesRepository
 import com.example.airvibe.feature.radar.data.seed.RadarSeedData
+import com.example.airvibe.feature.radar.domain.model.PersonProfile
+import com.example.airvibe.feature.radar.presentation.components.proximityMeters
 import com.example.airvibe.feature.radar.domain.repository.RadarRepository
 import com.example.airvibe.feature.radar.domain.repository.ScannerProfileRepository
 import com.example.airvibe.feature.radar.domain.scanner.RadarScanner
@@ -33,7 +35,7 @@ class RadarViewModel(
     private val authRepository: AuthRepository,
     private val matchPreferences: MatchPreferencesRepository,
     private val chatRepository: ChatRepository,
-    private val onSignOut: suspend () -> Unit = {},
+    private val onSignOut: suspend () -> Result<Unit> = { ServiceLocator.authRepository.signOut() },
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(RadarUiState())
@@ -41,6 +43,7 @@ class RadarViewModel(
 
     init {
         observeNodes()
+        observeLiveNodes()
         observeScannerState()
         observeMatchPreferences()
         observeUnreadChats()
@@ -71,6 +74,16 @@ class RadarViewModel(
         }
     }
 
+    private fun observeLiveNodes() {
+        viewModelScope.launch {
+            scanner.liveNodes
+                .onEach { live ->
+                    _uiState.update { it.copy(liveNodes = live) }
+                }
+                .collect()
+        }
+    }
+
     private fun observeScannerState() {
         viewModelScope.launch {
             scanner.state
@@ -78,12 +91,32 @@ class RadarViewModel(
                     val discovered = (scannerState as? ScannerState.Active)?.discovered ?: 0
                     val isScanning = scannerState is ScannerState.Active ||
                         scannerState is ScannerState.Starting
+                    val needsPermissions = scannerState is ScannerState.Error &&
+                        scannerState.reason == com.example.airvibe.feature.radar.domain.scanner.ScannerError.MissingPermissions
+                    val scanErrorMessage = (scannerState as? ScannerState.Error)?.let { error ->
+                        when (error.reason) {
+                            com.example.airvibe.feature.radar.domain.scanner.ScannerError.MissingPermissions ->
+                                "Faltan permisos de Bluetooth o Wi-Fi para escanear."
+                            com.example.airvibe.feature.radar.domain.scanner.ScannerError.BluetoothUnavailable ->
+                                "Activa el Bluetooth del dispositivo."
+                            com.example.airvibe.feature.radar.domain.scanner.ScannerError.LocationUnavailable ->
+                                "Activa la ubicación para mejorar el escaneo."
+                            is com.example.airvibe.feature.radar.domain.scanner.ScannerError.Unknown ->
+                                error.reason.message.ifBlank { "No se pudo iniciar el escaneo." }
+                        }
+                    }
                     _uiState.update {
                         it.copy(
                             scannerState = scannerState,
                             isScanning = isScanning,
                             discoveredPeers = discovered,
                             hideDemoNodes = isScanning || discovered > 0,
+                            pendingPermissionRequest = when {
+                                isScanning -> false
+                                needsPermissions -> true
+                                else -> it.pendingPermissionRequest
+                            },
+                            errorMessage = scanErrorMessage ?: if (isScanning) null else it.errorMessage,
                         )
                     }
                 }
@@ -139,6 +172,7 @@ class RadarViewModel(
             RadarUiEvent.AddToContacts -> addToContacts()
             RadarUiEvent.ToggleFavorite -> toggleFavorite()
             RadarUiEvent.DismissPermissions -> dismissPermissions()
+            RadarUiEvent.RequestPermissions -> _uiState.update { it.copy(pendingPermissionRequest = true) }
             RadarUiEvent.SignOut -> signOut()
             is RadarUiEvent.UpdateOwnProfile -> updateOwnProfile(event.profile)
             RadarUiEvent.OpenChats -> Unit
@@ -155,10 +189,14 @@ class RadarViewModel(
     }
 
     private fun showPreview(nodeId: String) {
+        if (nodeId.startsWith("pending-")) return
         if (nodeId.startsWith(RadarSeedData.SEED_ID_PREFIX) && _uiState.value.hideDemoNodes) return
-        val node = _uiState.value.nodes.firstOrNull { it.id == nodeId } ?: return
+        val node = _uiState.value.displayNodes.firstOrNull { it.id == nodeId }
+            ?: _uiState.value.nodes.firstOrNull { it.id == nodeId }
+            ?: return
         viewModelScope.launch {
             val profile = repository.getProfile(nodeId)
+                ?: PersonProfile.fromNode(node, distanceMeters = proximityMeters(node.distanceNormalized))
             _uiState.update {
                 it.copy(
                     selectedNode = node,
@@ -189,19 +227,24 @@ class RadarViewModel(
 
     private fun startScanning() {
         viewModelScope.launch {
-            _uiState.update { it.copy(pendingPermissionRequest = false) }
-            scannerLifecycle.execute(ScannerLifecycle.Action.Start)
-            val started = scanner.start(profileRepository.current())
-            if (!started) {
-                _uiState.update { it.copy(pendingPermissionRequest = true) }
+            runCatching {
+                scannerLifecycle.execute(ScannerLifecycle.Action.Start)
+            }.onFailure {
+                _uiState.update { state ->
+                    state.copy(
+                        pendingPermissionRequest = true,
+                        errorMessage = "Activa los permisos del radar para escanear.",
+                    )
+                }
             }
         }
     }
 
     private fun stopScanning() {
         viewModelScope.launch {
-            scanner.stop()
-            scannerLifecycle.execute(ScannerLifecycle.Action.Stop)
+            runCatching {
+                scannerLifecycle.execute(ScannerLifecycle.Action.Stop)
+            }
         }
     }
 
@@ -236,10 +279,12 @@ class RadarViewModel(
         viewModelScope.launch {
             profileRepository.update(displayName, status, tags)
             val updated = profileRepository.current()
-            scanner.updateProfile(updated)
+            runCatching { scanner.updateProfile(updated) }
             if (_uiState.value.isScanning) {
-                scanner.stop()
-                scanner.start(updated)
+                runCatching {
+                    scannerLifecycle.execute(ScannerLifecycle.Action.Stop)
+                    scannerLifecycle.execute(ScannerLifecycle.Action.Start)
+                }
             }
             _uiState.update { it.copy(isOwnProfileVisible = false) }
         }
@@ -264,9 +309,18 @@ class RadarViewModel(
 
     private fun signOut() {
         viewModelScope.launch {
-            scanner.stop()
-            scannerLifecycle.execute(ScannerLifecycle.Action.Stop)
-            onSignOut()
+            runCatching {
+                scannerLifecycle.execute(ScannerLifecycle.Action.Stop)
+            }
+            runCatching {
+                scanner.stop()
+            }
+            val result = onSignOut()
+            result.onFailure { error ->
+                _uiState.update {
+                    it.copy(errorMessage = error.message ?: "No se pudo cerrar sesión")
+                }
+            }
         }
     }
 
@@ -279,7 +333,7 @@ class RadarViewModel(
         private val authRepository: AuthRepository = ServiceLocator.authRepository,
         private val matchPreferences: MatchPreferencesRepository = ServiceLocator.matchPreferencesRepository,
         private val chatRepository: ChatRepository = ServiceLocator.chatRepository,
-        private val onSignOut: suspend () -> Unit = { ServiceLocator.authRepository.signOut() },
+        private val onSignOut: suspend () -> Result<Unit> = { ServiceLocator.authRepository.signOut() },
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {

@@ -111,8 +111,6 @@ class MatchNotificationManager(
 
     companion object {
         const val CHANNEL_ID = "airvibe.matches"
-        const val CHANNEL_NAME_RES = R.string.match_channel_name
-        const val CHANNEL_DESCRIPTION_RES = R.string.match_channel_description
 
         fun ensureChannel(context: Context) {
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
@@ -121,10 +119,10 @@ class MatchNotificationManager(
 
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                context.getString(CHANNEL_NAME_RES),
+                context.getString(R.string.match_channel_name),
                 NotificationManager.IMPORTANCE_HIGH,
             ).apply {
-                description = context.getString(CHANNEL_DESCRIPTION_RES)
+                description = context.getString(R.string.match_channel_description)
                 enableLights(true)
                 enableVibration(true)
                 lockscreenVisibility = Notification.VISIBILITY_PUBLIC

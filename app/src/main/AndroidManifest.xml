@@ -48,6 +48,15 @@
         tools:targetApi="tiramisu" />
 
     <!--
+        Nearby Connections consulta el estado Wi-Fi para Wi-Fi Direct.
+        Son permisos de instalación (no runtime), pero deben declararse
+        o Play Services devuelve MISSING_PERMISSION_ACCESS_WIFI_STATE.
+    -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!--
         Ubicación precisa. Sigue siendo obligatoria incluso en
         Android 13+ para el escaneo Bluetooth clásico. Por eso
         la declaramos sin maxSdkVersion. En Android 12+ también

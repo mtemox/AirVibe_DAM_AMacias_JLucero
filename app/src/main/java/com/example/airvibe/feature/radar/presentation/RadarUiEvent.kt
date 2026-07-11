@@ -17,6 +17,8 @@ sealed interface RadarUiEvent {
     data object AddToContacts : RadarUiEvent
     data object ToggleFavorite : RadarUiEvent
     data object DismissPermissions : RadarUiEvent
+    /** Muestra el modal de permisos antes de iniciar el escaneo. */
+    data object RequestPermissions : RadarUiEvent
     data object SignOut : RadarUiEvent
     data class UpdateOwnProfile(val profile: ScannerProfile) : RadarUiEvent
 

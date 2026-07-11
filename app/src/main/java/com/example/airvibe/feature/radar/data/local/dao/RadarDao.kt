@@ -64,6 +64,9 @@ interface RadarDao {
     @Query("DELETE FROM radar_nodes WHERE id NOT LIKE 'LOCAL\\_%' ESCAPE '\\'")
     suspend fun clearDiscovered()
 
+    @Query("DELETE FROM radar_nodes WHERE id LIKE 'pending-%'")
+    suspend fun deletePendingNodes()
+
     @Query("DELETE FROM radar_nodes")
     suspend fun clear()
 

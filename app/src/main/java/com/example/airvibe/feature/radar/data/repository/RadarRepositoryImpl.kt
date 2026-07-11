@@ -80,4 +80,8 @@ class RadarRepositoryImpl(
     override suspend fun clearDiscoveredNodes() {
         radarDao.clearDiscovered()
     }
+
+    override suspend fun removePendingNodes() {
+        radarDao.deletePendingNodes()
+    }
 }

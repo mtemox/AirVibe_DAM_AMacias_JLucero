@@ -1,5 +1,6 @@
 package com.example.airvibe.feature.radar.domain.scanner
 
+import com.example.airvibe.feature.radar.domain.model.RadarNode
 import kotlinx.coroutines.flow.StateFlow
 
 /**
@@ -17,6 +18,9 @@ interface RadarScanner {
 
     /** Estado reactivo del scanner. */
     val state: StateFlow<ScannerState>
+
+    /** Nodos en memoria durante la sesión (sin depender solo de Room). */
+    val liveNodes: StateFlow<List<RadarNode>>
 
     /**
      * Inicia el escaneo + advertising. Devuelve `false` si el

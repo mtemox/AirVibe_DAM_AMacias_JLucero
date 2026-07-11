@@ -7,10 +7,15 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -45,6 +50,7 @@ import com.example.airvibe.feature.radar.domain.model.PersonProfile
 import com.example.airvibe.feature.radar.domain.model.PresenceStatus
 import com.example.airvibe.feature.radar.domain.model.RadarNodeKind
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ProfilePreviewContent(
     profile: PersonProfile,
@@ -60,6 +66,7 @@ fun ProfilePreviewContent(
     Column(
         modifier = modifier
             .fillMaxWidth()
+            .verticalScroll(rememberScrollState())
             .navigationBarsPadding()
             .padding(horizontal = 16.dp)
             .padding(bottom = 24.dp),
@@ -82,10 +89,11 @@ fun ProfilePreviewContent(
             contentPadding = PaddingValues(20.dp),
             tint = accentColor.copy(alpha = 0.08f),
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
-            ) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
                 Box(contentAlignment = Alignment.BottomEnd) {
                     AvatarMonogram(
                         name = profile.displayName,
@@ -105,29 +113,32 @@ fun ProfilePreviewContent(
                     }
                 }
                 Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(end = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Text(
-                            text = profile.displayName,
-                            style = MaterialTheme.typography.headlineSmall.copy(
-                                fontWeight = FontWeight.SemiBold,
-                            ),
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                        GlassPill(
-                            text = nodeKind.displayName,
-                            tint = accentColor,
-                        )
-                    }
+                    Text(
+                        text = profile.displayName,
+                        style = MaterialTheme.typography.headlineSmall.copy(
+                            fontWeight = FontWeight.SemiBold,
+                        ),
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    GlassPill(
+                        text = nodeKind.displayName,
+                        tint = accentColor,
+                    )
                     Text(
                         text = profile.headline,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.fillMaxWidth(),
                     )
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -176,32 +187,45 @@ fun ProfilePreviewContent(
                     )
                 }
             }
+            }
         }
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        // Bio
+        val bioText = bioForPreview(profile)
+
+        // Bio + etiquetas
         GlassCard(
             modifier = Modifier.fillMaxWidth(),
             cornerRadius = 22.dp,
             contentPadding = PaddingValues(18.dp),
         ) {
-            Text(
-                text = "Sobre ${profile.displayName.substringBefore(' ')}",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = profile.bio,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            if (profile.tags.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(12.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    profile.tags.take(3).forEach { tag ->
-                        GlassPill(text = "#$tag", tint = accentColor)
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text(
+                    text = "Sobre ${profile.displayName.substringBefore(' ')}",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (bioText.isNotBlank()) {
+                    Text(
+                        text = bioText,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                if (profile.tags.isNotEmpty()) {
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        profile.tags.take(6).forEach { tag ->
+                            GlassPill(text = "#$tag", tint = accentColor)
+                        }
                     }
                 }
             }
@@ -231,6 +255,19 @@ fun ProfilePreviewContent(
 
         Spacer(modifier = Modifier.height(10.dp))
     }
+}
+
+/** Evita repetir en bio lo que ya se muestra como chips de etiquetas. */
+private fun bioForPreview(profile: PersonProfile): String {
+    var text = profile.bio.trim()
+    profile.tags.forEach { tag ->
+        text = text.replace(" · $tag", "")
+            .replace("· $tag", "")
+            .replace(tag, "")
+    }
+    text = text.trim(' ', '·', ',', ';')
+    if (text.isBlank() || text == profile.headline) return profile.headline
+    return text
 }
 
 @Composable

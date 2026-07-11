@@ -6,7 +6,10 @@ import com.example.airvibe.feature.chat.data.repository.ChatRepositoryImpl
 import com.example.airvibe.feature.chat.domain.model.MessageKind
 import com.example.airvibe.feature.chat.domain.scanner.ChatMessageGateway
 import com.example.airvibe.feature.radar.data.device.nearby.NearbyPayloadCodec
-import com.example.airvibe.feature.radar.domain.scanner.ScannerProfile
+import com.example.airvibe.feature.radar.domain.repository.RadarRepository
+import com.example.airvibe.feature.radar.domain.model.PresenceStatus
+import com.example.airvibe.feature.radar.domain.model.RadarNode
+import com.example.airvibe.feature.radar.domain.model.RadarNodeKind
 import com.google.android.gms.nearby.Nearby
 import com.google.android.gms.nearby.connection.ConnectionsClient
 import com.google.android.gms.nearby.connection.Payload
@@ -41,6 +44,8 @@ class NearbyChatMessageGateway(
     private val chatRepository: ChatRepositoryImpl,
     private val localUserIdProvider: () -> String,
     private val connectedEndpointsProvider: () -> Set<String>,
+    private val radarRepository: RadarRepository,
+    private val onPeerBound: ((nodeId: String, endpointId: String) -> Unit)? = null,
 ) : ChatMessageGateway {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -141,6 +146,7 @@ class NearbyChatMessageGateway(
         // Vinculamos el endpoint ↔ nodo para futuros envíos.
         scope.launch {
             bindEndpoint(senderNodeId, endpointId)
+            ensureRadarNode(senderNodeId, endpointId)
         }
 
         scope.launch {
@@ -160,6 +166,37 @@ class NearbyChatMessageGateway(
      * el encapsulamiento desde otros archivos del paquete.
      */
     fun isNodeReachable(nodeId: String): Boolean = nodeToEndpoint.containsKey(nodeId)
+
+    private suspend fun ensureRadarNode(nodeId: String, endpointId: String) {
+        if (radarRepository.getProfile(nodeId) != null) {
+            onPeerBound?.invoke(nodeId, endpointId)
+            return
+        }
+        val angle = (nodeId.hashCode().toLong() and 0xFFFFFFFFL)
+            .let { ((it % 360).toInt()).toFloat() }
+            .coerceIn(0f, 359.9f)
+        val palette = listOf(
+            0xFF6366F1, 0xFF06B6D4, 0xFF10B981, 0xFFF59E0B,
+            0xFFEC4899, 0xFF8B5CF6, 0xFF0EA5E9,
+        )
+        val accent = androidx.compose.ui.graphics.Color(
+            palette[(nodeId.hashCode().toLong() and 0x7FFFFFFF).toInt() % palette.size].toInt(),
+        )
+        val node = RadarNode(
+            id = nodeId,
+            displayName = "Usuario cercano",
+            status = "Disponible por proximidad",
+            detail = "Perfil recibido por conexión local",
+            kind = RadarNodeKind.Person,
+            presence = PresenceStatus.Online,
+            angleDegrees = angle,
+            distanceNormalized = 0.45f,
+            signalStrength = 0.72f,
+            accentColor = accent,
+        )
+        radarRepository.upsertNode(node)
+        onPeerBound?.invoke(nodeId, endpointId)
+    }
 
     companion object {
         private const val TAG = "NearbyChatGateway"

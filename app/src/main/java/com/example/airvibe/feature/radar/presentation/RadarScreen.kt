@@ -33,10 +33,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -52,6 +50,9 @@ import com.example.airvibe.feature.radar.presentation.components.BroadcastSheet
 import com.example.airvibe.feature.radar.presentation.components.OwnProfileSheet
 import com.example.airvibe.feature.radar.presentation.components.ProfilePreviewContent
 import com.example.airvibe.feature.radar.presentation.components.RadarControlPanel
+import com.example.airvibe.feature.radar.presentation.components.NearbyPeersStrip
+import com.example.airvibe.feature.radar.presentation.components.RadarDistanceRings
+import com.example.airvibe.feature.radar.presentation.components.RadarMapBackground
 import com.example.airvibe.feature.radar.presentation.components.RadarNodeBubble
 import com.example.airvibe.feature.radar.presentation.components.RadarSweep
 import com.example.airvibe.feature.radar.presentation.components.RadarTopBar
@@ -92,7 +93,7 @@ fun RadarScreen(
         ) {
             RadarTopBar(
                 userName = displayName,
-                activeCount = state.activeNodeCount,
+                activeCount = state.proximityCount,
                 isScanning = state.isScanning,
                 discoveredPeers = state.discoveredPeers,
                 chatCount = state.unreadChatCount,
@@ -108,8 +109,9 @@ fun RadarScreen(
                     .padding(horizontal = 12.dp),
             ) {
                 RadarCanvas(
-                    nodes = state.visibleNodes,
+                    nodes = state.displayNodes,
                     isScanning = state.isScanning,
+                    discoveredPeers = state.discoveredPeers,
                     onNodeClick = { viewModel.onEvent(RadarUiEvent.NodeClicked(it.id)) },
                     modifier = Modifier.fillMaxSize(),
                 )
@@ -122,7 +124,13 @@ fun RadarScreen(
                 contentAlignment = Alignment.Center,
             ) {
                 RadarControlPanel(
-                    onScanToggle = { viewModel.onEvent(RadarUiEvent.ToggleScan) },
+                    onScanToggle = {
+                        if (!state.isScanning && !permissionsState.allGranted) {
+                            viewModel.onEvent(RadarUiEvent.RequestPermissions)
+                        } else {
+                            viewModel.onEvent(RadarUiEvent.ToggleScan)
+                        }
+                    },
                     onBroadcast = { viewModel.onEvent(RadarUiEvent.OpenBroadcast) },
                     onCenter = { viewModel.onEvent(RadarUiEvent.Refresh) },
                     onFilter = { viewModel.onEvent(RadarUiEvent.OpenMatchFilters) },
@@ -134,6 +142,7 @@ fun RadarScreen(
 
     PermissionsModal(
         state = permissionsState,
+        visible = shouldShowPermissions,
         onDismiss = { viewModel.onEvent(RadarUiEvent.DismissPermissions) },
     )
 
@@ -299,35 +308,54 @@ private fun radarViewModel(): RadarViewModel {
 private fun RadarCanvas(
     nodes: List<RadarNode>,
     isScanning: Boolean,
+    discoveredPeers: Int,
     onNodeClick: (RadarNode) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var sizePx: IntSize = remember { IntSize.Zero }
-    val canRenderNodes = sizePx.width > 0 && sizePx.height > 0
+    Box(modifier = modifier) {
+        RadarMapBackground(modifier = Modifier.fillMaxSize())
 
-    Box(
-        modifier = modifier.onSizeChanged { sizePx = it },
-    ) {
+        RadarDistanceRings(
+            modifier = Modifier.fillMaxSize(),
+            ringColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.22f),
+        )
+
         RadarSweep(
             modifier = Modifier.fillMaxSize(),
             sweepColor = MaterialTheme.colorScheme.primary,
+            gridColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.28f),
         )
 
-        if (canRenderNodes) {
-            val side = minOf(sizePx.width, sizePx.height).toFloat()
-            nodes.forEach { node ->
-                RadarNodeBubble(
-                    node = node,
-                    canvasSizePx = side,
-                    onClick = onNodeClick,
-                )
-            }
+        nodes.forEach { node ->
+            RadarNodeBubble(
+                node = node,
+                onClick = onNodeClick,
+            )
         }
 
         Box(
             modifier = Modifier.align(Alignment.Center),
         ) {
             CenterHub(isScanning = isScanning)
+        }
+
+        NearbyPeersStrip(
+            nodes = nodes,
+            onNodeClick = onNodeClick,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 8.dp),
+        )
+
+        if (nodes.isEmpty() && isScanning && discoveredPeers > 0) {
+            Text(
+                text = "Sincronizando $discoveredPeers dispositivo(s)…",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 56.dp),
+            )
         }
     }
 }
