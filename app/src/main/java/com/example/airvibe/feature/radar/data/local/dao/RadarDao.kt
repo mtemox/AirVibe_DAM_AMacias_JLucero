@@ -64,6 +64,9 @@ interface RadarDao {
     @Query("DELETE FROM radar_nodes WHERE id NOT LIKE 'LOCAL\\_%' ESCAPE '\\'")
     suspend fun clearDiscovered()
 
+    @Query("SELECT * FROM radar_nodes WHERE is_favorite = 1 ORDER BY display_name ASC")
+    fun observeFavorites(): Flow<List<NodeEntity>>
+
     @Query("DELETE FROM radar_nodes WHERE id LIKE 'pending-%'")
     suspend fun deletePendingNodes()
 

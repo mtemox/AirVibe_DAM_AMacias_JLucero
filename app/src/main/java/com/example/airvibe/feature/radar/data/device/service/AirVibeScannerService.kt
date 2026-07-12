@@ -50,6 +50,7 @@ class AirVibeScannerService : Service() {
         super.onCreate()
         runCatching { ScannerNotificationFactory.ensureChannel(this) }
         runCatching { MatchNotificationManager.ensureChannel(this) }
+        runCatching { com.example.airvibe.feature.chat.data.notification.RoomInviteNotificationManager.ensureChannel(this) }
         runCatching { ServiceLocator.startMatchManager() }
     }
 

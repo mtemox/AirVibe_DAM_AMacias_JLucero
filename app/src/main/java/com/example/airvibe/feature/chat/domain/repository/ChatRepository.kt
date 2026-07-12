@@ -50,21 +50,18 @@ interface ChatRepository {
     ): ChatMessage
 
     /**
-     * Envía el mismo texto a **todos** los peers actualmente
-     * conectados. Devuelve el número de peers a los que se
-     * entregó el payload.
+     * Crea una sala y envía invitación a todos los peers conectados.
+     * Devuelve cantidad de destinatarios y el id de la sala creada.
      */
-    suspend fun broadcast(text: String): Int
+    suspend fun broadcast(text: String): BroadcastResult
 
     /** Elimina el historial de chat con un peer. */
     suspend fun clearConversation(peerNodeId: String)
+
+    /** Envía un mensaje en una sala de proximidad. */
+    suspend fun sendRoomMessage(roomId: String, text: String): com.example.airvibe.feature.chat.domain.model.RoomMessage
 }
 
-/**
- * Resumen de una conversación, derivado de la tabla
- * `chat_messages`. La capa de UI lo consume en la bandeja de
- * entrada.
- */
 data class ConversationSummary(
     val nodeId: String,
     val displayName: String,
@@ -72,4 +69,9 @@ data class ConversationSummary(
     val lastTimestamp: Long,
     val unreadCount: Int,
     val isGroupInvite: Boolean,
+)
+
+data class BroadcastResult(
+    val recipientCount: Int,
+    val roomId: String,
 )

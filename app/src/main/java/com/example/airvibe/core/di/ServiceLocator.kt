@@ -5,6 +5,11 @@ import com.example.airvibe.core.network.SupabaseClientFactory
 import com.example.airvibe.feature.auth.data.repository.SupabaseAuthRepository
 import com.example.airvibe.feature.auth.domain.repository.AuthRepository
 import com.example.airvibe.feature.chat.data.device.nearby.NearbyChatMessageGateway
+import com.example.airvibe.feature.chat.data.local.dao.ProximityRoomDao
+import com.example.airvibe.feature.chat.data.remote.SupabaseProximityRoomDataSource
+import com.example.airvibe.feature.chat.data.remote.SupabaseRoomMessageDataSource
+import com.example.airvibe.feature.chat.data.repository.ProximityRoomRepositoryImpl
+import com.example.airvibe.feature.chat.domain.repository.ProximityRoomRepository
 import com.example.airvibe.feature.chat.data.notification.MatchEngine
 import com.example.airvibe.feature.chat.data.notification.MatchNotificationManager
 import com.example.airvibe.feature.chat.data.repository.ChatRepositoryImpl
@@ -18,6 +23,9 @@ import com.example.airvibe.feature.radar.data.device.service.AirVibeScannerServi
 import com.example.airvibe.feature.radar.data.local.dao.RadarDao
 import com.example.airvibe.feature.radar.data.local.database.AirVibeDatabase
 import com.example.airvibe.feature.radar.data.remote.SupabaseNodeDataSource
+import com.example.airvibe.feature.radar.data.remote.SupabaseProfileDataSource
+import com.example.airvibe.feature.radar.data.remote.SupabaseSavedContactDataSource
+import com.example.airvibe.feature.radar.data.sync.CloudSyncService
 import com.example.airvibe.feature.radar.data.repository.RadarRepositoryImpl
 import com.example.airvibe.feature.radar.data.repository.ScannerProfileRepositoryImpl
 import com.example.airvibe.feature.radar.data.sync.AirVibeWorkManagerConfiguration
@@ -65,18 +73,25 @@ object ServiceLocator {
     }
 
     val radarDao: RadarDao by lazy { database.radarDao() }
+    val savedContactDao by lazy { database.savedContactDao() }
     val chatDao by lazy { database.chatDao() }
+    val proximityRoomDao: ProximityRoomDao by lazy { database.proximityRoomDao() }
 
     val supabaseClient: SupabaseClient by lazy { SupabaseClientFactory.create() }
 
-    val radarRepository: RadarRepository by lazy { RadarRepositoryImpl(radarDao) }
+    val radarRepository: RadarRepository by lazy {
+        RadarRepositoryImpl(radarDao, savedContactDao)
+    }
 
     val authRepository: AuthRepository by lazy {
         SupabaseAuthRepository(
             supabase = supabaseClient,
             onSignedIn = {
-                // Al iniciar sesión, dispara una sincronización
-                // inmediata para empujar el contenido local.
+                val userId = authRepository.currentUser.value?.id
+                if (userId != null) {
+                    runCatching { scannerProfileRepository.restoreFromRemote(userId) }
+                    runCatching { cloudSyncService.restoreFromRemote(userId) }
+                }
                 SyncScheduler.requestNow()
                 SyncScheduler.ensurePeriodic()
             },
@@ -97,10 +112,38 @@ object ServiceLocator {
         DeviceIdentityProvider(requireNotNull(appContext) { "ServiceLocator.init(context) required." })
     }
 
+    val profileRemoteDataSource: SupabaseProfileDataSource by lazy {
+        SupabaseProfileDataSource(supabase = supabaseClient)
+    }
+
+    val savedContactRemoteDataSource: SupabaseSavedContactDataSource by lazy {
+        SupabaseSavedContactDataSource(supabase = supabaseClient)
+    }
+
+    val proximityRoomRemoteDataSource: SupabaseProximityRoomDataSource by lazy {
+        SupabaseProximityRoomDataSource(supabase = supabaseClient)
+    }
+
+    val roomMessageRemoteDataSource: SupabaseRoomMessageDataSource by lazy {
+        SupabaseRoomMessageDataSource(supabase = supabaseClient)
+    }
+
+    val cloudSyncService: CloudSyncService by lazy {
+        CloudSyncService(
+            savedContactDao = savedContactDao,
+            roomDao = proximityRoomDao,
+            savedContactRemote = savedContactRemoteDataSource,
+            roomRemote = proximityRoomRemoteDataSource,
+            roomMessageRemote = roomMessageRemoteDataSource,
+        )
+    }
+
     val scannerProfileRepository: ScannerProfileRepository by lazy {
         ScannerProfileRepositoryImpl(
             context = requireNotNull(appContext) { "ServiceLocator.init(context) required." },
             deviceIdentity = deviceIdentityProvider,
+            profileRemote = profileRemoteDataSource,
+            currentAuthUserId = { authRepository.currentUser.value?.id },
         )
     }
 
@@ -113,8 +156,20 @@ object ServiceLocator {
         MatchPreferencesRepositoryImpl(appContext!!)
     }
 
+    /** Sincroniza contactos guardados pendientes tras login o al guardar. */
+    fun requestContactsSync() = SyncScheduler.requestNow()
+
     val matchEngine: MatchEngine by lazy {
         MatchEngine(preferences = matchPreferencesRepository)
+    }
+
+    val proximityRoomRepository: ProximityRoomRepository by lazy {
+        ProximityRoomRepositoryImpl(
+            roomDao = proximityRoomDao,
+            localUserIdProvider = { scannerProfileProvider().id },
+            localDisplayNameProvider = { scannerProfileProvider().displayName },
+            onDataChanged = { SyncScheduler.requestNow() },
+        )
     }
 
     val chatRepositoryImpl: ChatRepositoryImpl by lazy {
@@ -122,13 +177,21 @@ object ServiceLocator {
             chatDao = chatDao,
             gateway = object : ChatMessageGateway {
                 override suspend fun sendMessage(targetNodeId: String, text: String): Boolean =
-                    chatGateway.sendMessage(targetNodeId, text)
+                    chatGatewayImpl.sendMessage(targetNodeId, text)
                 override suspend fun broadcast(text: String): Int =
-                    chatGateway.broadcast(text)
+                    chatGatewayImpl.broadcast(text)
+                override suspend fun broadcastRoomInvite(text: String, roomId: String): Int =
+                    chatGatewayImpl.broadcastRoomInvite(text, roomId)
+                override suspend fun sendRoomMessage(roomId: String, text: String, messageId: String): Boolean =
+                    chatGatewayImpl.sendRoomMessage(roomId, text, messageId)
+                override suspend fun sendFriendAdd(targetNodeId: String): Boolean =
+                    chatGatewayImpl.sendFriendAdd(targetNodeId)
                 override fun onIncomingPayload(endpointId: String, bytes: ByteArray): Boolean =
-                    chatGateway.onIncomingPayload(endpointId, bytes)
+                    chatGatewayImpl.onIncomingPayload(endpointId, bytes)
             },
+            roomRepository = proximityRoomRepository,
             localUserIdProvider = { scannerProfileProvider().id },
+            localDisplayNameProvider = { scannerProfileProvider().displayName },
         )
     }
 
@@ -141,7 +204,10 @@ object ServiceLocator {
         NearbyChatMessageGateway(
             context = appContext!!,
             chatRepository = chatRepositoryImpl,
+            roomRepository = proximityRoomRepository as ProximityRoomRepositoryImpl,
             localUserIdProvider = { scannerProfileProvider().id },
+            localDisplayNameProvider = { scannerProfileProvider().displayName },
+            localProfileProvider = { scannerProfileProvider() },
             connectedEndpointsProvider = { radarScannerConnectedEndpoints() },
             radarRepository = radarRepository,
             onPeerBound = { nodeId, endpointId ->

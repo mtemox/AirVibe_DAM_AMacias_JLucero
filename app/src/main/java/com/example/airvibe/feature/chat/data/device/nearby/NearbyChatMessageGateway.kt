@@ -2,14 +2,16 @@ package com.example.airvibe.feature.chat.data.device.nearby
 
 import android.content.Context
 import android.util.Log
+import com.example.airvibe.feature.chat.data.notification.RoomInviteNotificationManager
 import com.example.airvibe.feature.chat.data.repository.ChatRepositoryImpl
+import com.example.airvibe.feature.chat.data.repository.ProximityRoomRepositoryImpl
 import com.example.airvibe.feature.chat.domain.model.MessageKind
 import com.example.airvibe.feature.chat.domain.scanner.ChatMessageGateway
-import com.example.airvibe.feature.radar.data.device.nearby.NearbyPayloadCodec
-import com.example.airvibe.feature.radar.domain.repository.RadarRepository
 import com.example.airvibe.feature.radar.domain.model.PresenceStatus
 import com.example.airvibe.feature.radar.domain.model.RadarNode
 import com.example.airvibe.feature.radar.domain.model.RadarNodeKind
+import com.example.airvibe.feature.radar.domain.scanner.ScannerProfile
+import com.example.airvibe.feature.radar.domain.repository.RadarRepository
 import com.google.android.gms.nearby.Nearby
 import com.google.android.gms.nearby.connection.ConnectionsClient
 import com.google.android.gms.nearby.connection.Payload
@@ -21,28 +23,13 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-/**
- * Implementación del [ChatMessageGateway] basada en la API de
- * **Nearby Connections**.
- *
- * Responsabilidades:
- *
- *  - Mantener el mapping `nodeId → endpointId` (alimentado por
- *    el scanner cuando recibe un perfil).
- *  - Codificar los mensajes a bytes y enviarlos por
- *    [ConnectionsClient.sendPayload].
- *  - Decodificar los payloads entrantes y delegar la
- *    persistencia al [ChatRepositoryImpl] (Single Source of
- *    Truth).
- *
- * El gateway **no** mantiene estado de UI: la presentación
- * consume `Flow`s de Room y reacciona automáticamente a las
- * inserciones que hacemos aquí.
- */
 class NearbyChatMessageGateway(
     private val context: Context,
     private val chatRepository: ChatRepositoryImpl,
+    private val roomRepository: ProximityRoomRepositoryImpl,
     private val localUserIdProvider: () -> String,
+    private val localDisplayNameProvider: () -> String,
+    private val localProfileProvider: () -> ScannerProfile,
     private val connectedEndpointsProvider: () -> Set<String>,
     private val radarRepository: RadarRepository,
     private val onPeerBound: ((nodeId: String, endpointId: String) -> Unit)? = null,
@@ -51,7 +38,6 @@ class NearbyChatMessageGateway(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val mutex = Mutex()
 
-    /** Mapeo `nodeId → endpointId` activo durante la sesión. */
     private val nodeToEndpoint = mutableMapOf<String, String>()
     private val endpointToNode = mutableMapOf<String, String>()
 
@@ -59,13 +45,7 @@ class NearbyChatMessageGateway(
         Nearby.getConnectionsClient(context)
     }
 
-    /**
-     * Vincula un endpoint recién descubierto con el id estable
-     * del perfil. Lo llama el scanner tras decodificar un payload
-     * `v1|profile|…`.
-     */
     suspend fun bindEndpoint(nodeId: String, endpointId: String) = mutex.withLock {
-        // Si el endpoint ya estaba mapeado a otro nodo, lo limpiamos.
         val previousNode = endpointToNode[endpointId]
         if (previousNode != null && previousNode != nodeId) {
             nodeToEndpoint.remove(previousNode)
@@ -74,7 +54,6 @@ class NearbyChatMessageGateway(
         endpointToNode[endpointId] = nodeId
     }
 
-    /** Limpia el mapping de un endpoint que se desconectó. */
     suspend fun unbindEndpoint(endpointId: String) = mutex.withLock {
         val nodeId = endpointToNode.remove(endpointId)
         if (nodeId != null) nodeToEndpoint.remove(nodeId)
@@ -86,8 +65,7 @@ class NearbyChatMessageGateway(
                 Log.w(TAG, "sendMessage: no endpoint for nodeId=$targetNodeId")
                 return false
             }
-        val bytes = NearbyChatPayloadCodec.encode(
-            kind = NearbyChatPayloadKind.Chat,
+        val bytes = NearbyChatPayloadCodec.encodeChat(
             messageId = UUID.randomUUID().toString(),
             senderNodeId = localUserIdProvider(),
             text = text,
@@ -102,69 +80,171 @@ class NearbyChatMessageGateway(
         }
     }
 
-    override suspend fun broadcast(text: String): Int {
+    override suspend fun broadcast(text: String): Int =
+        broadcastRoomInvite(text, UUID.randomUUID().toString())
+
+    override suspend fun broadcastRoomInvite(text: String, roomId: String): Int {
         val endpoints = connectedEndpointsProvider()
         if (endpoints.isEmpty()) return 0
 
-        val bytes = NearbyChatPayloadCodec.encode(
-            kind = NearbyChatPayloadKind.GroupInvite,
+        val bytes = NearbyChatPayloadCodec.encodeInvite(
             messageId = UUID.randomUUID().toString(),
             senderNodeId = localUserIdProvider(),
+            senderName = localProfileProvider().displayName,
             text = text,
             createdAtMillis = System.currentTimeMillis(),
+            roomId = roomId,
         )
-
         val payload = Payload.fromBytes(bytes)
         val result = runCatching { connectionsClient.sendPayload(endpoints.toList(), payload) }
         if (result.isFailure) {
-            Log.w(TAG, "broadcast: sendPayload failed: ${result.exceptionOrNull()?.message}")
+            Log.w(TAG, "broadcastRoomInvite failed: ${result.exceptionOrNull()?.message}")
         }
+        return endpoints.size
+    }
 
-        // Por cada peer con el que tengamos mapping, dejamos
-        // constancia en Room. Si el peer no está mapeado (porque
-        // su perfil no llegó todavía) no podemos asociarlo a un
-        // chat, pero el broadcast físico sí ocurre.
-        val peers = mutex.withLock { nodeToEndpoint.keys.toList() }
-        peers.forEach { peerNodeId ->
-            scope.launch {
-                chatRepository.persistOutgoingInvite(peerNodeId, text)
-            }
+    override suspend fun sendRoomMessage(roomId: String, text: String, messageId: String): Boolean {
+        val localId = localUserIdProvider()
+        val endpoints = resolveRoomEndpoints(localId)
+        if (endpoints.isEmpty()) return false
+        val bytes = NearbyChatPayloadCodec.encodeRoomMessage(
+            messageId = messageId,
+            senderNodeId = localId,
+            senderName = localProfileProvider().displayName,
+            roomId = roomId,
+            text = text,
+            createdAtMillis = System.currentTimeMillis(),
+        )
+        val payload = Payload.fromBytes(bytes)
+        var delivered = 0
+        endpoints.forEach { endpointId ->
+            val sent = runCatching {
+                connectionsClient.sendPayload(endpointId, payload)
+            }.isSuccess
+            if (sent) delivered++
+            Log.d(TAG, "sendRoomMessage to $endpointId: $sent")
         }
-        return peers.size.coerceAtMost(endpoints.size)
+        Log.d(TAG, "sendRoomMessage delivered=$delivered/${endpoints.size}")
+        return delivered > 0
+    }
+
+    private suspend fun resolveRoomEndpoints(localNodeId: String): List<String> = mutex.withLock {
+        // endpointToNode.keys are endpointIds (not nodeIds) — use them directly
+        val fromBindings = endpointToNode.keys
+        val fromScanner = connectedEndpointsProvider()
+        (fromBindings + fromScanner).distinct()
+    }
+
+    override suspend fun sendFriendAdd(targetNodeId: String): Boolean {
+        val endpointId = mutex.withLock { nodeToEndpoint[targetNodeId] }
+            ?: return false
+        val ownProfile = localProfileProvider()
+        val bytes = NearbyChatPayloadCodec.encodeFriendAdd(
+            messageId = UUID.randomUUID().toString(),
+            senderNodeId = localUserIdProvider(),
+            displayName = ownProfile.displayName,
+            status = ownProfile.status,
+            detail = ownProfile.status,
+            tags = ownProfile.tags,
+            createdAtMillis = System.currentTimeMillis(),
+        )
+        return runCatching {
+            connectionsClient.sendPayload(endpointId, Payload.fromBytes(bytes))
+        }.isSuccess
     }
 
     override fun onIncomingPayload(endpointId: String, bytes: ByteArray): Boolean {
         if (!NearbyChatPayloadCodec.looksLikeChatPayload(bytes)) return false
         val decoded = NearbyChatPayloadCodec.decode(bytes) ?: return false
-
         val senderNodeId = decoded.senderNodeId
-        val kind = when (decoded.kind) {
-            NearbyChatPayloadKind.Chat -> MessageKind.Text
-            NearbyChatPayloadKind.GroupInvite -> MessageKind.GroupInvite
-        }
 
-        // Vinculamos el endpoint ↔ nodo para futuros envíos.
         scope.launch {
             bindEndpoint(senderNodeId, endpointId)
             ensureRadarNode(senderNodeId, endpointId)
         }
 
-        scope.launch {
-            chatRepository.persistIncoming(
-                peerNodeId = senderNodeId,
-                text = decoded.text,
-                kind = kind,
-                createdAt = decoded.createdAtMillis,
-            )
+        when (decoded.kind) {
+            NearbyChatPayloadKind.Chat -> {
+                scope.launch {
+                    chatRepository.persistIncoming(
+                        peerNodeId = senderNodeId,
+                        text = decoded.text,
+                        kind = MessageKind.Text,
+                        createdAt = decoded.createdAtMillis,
+                    )
+                }
+            }
+            NearbyChatPayloadKind.GroupInvite -> {
+                val roomId = decoded.roomId
+                if (roomId.isNullOrBlank()) {
+                    scope.launch {
+                        chatRepository.persistIncoming(
+                            peerNodeId = senderNodeId,
+                            text = decoded.text,
+                            kind = MessageKind.GroupInvite,
+                            createdAt = decoded.createdAtMillis,
+                        )
+                    }
+                } else {
+                    scope.launch {
+                        val hostName = decoded.senderDisplayName?.takeIf { it.isNotBlank() }
+                            ?: radarRepository.getProfile(senderNodeId)?.displayName
+                            ?: "Usuario cercano"
+                        roomRepository.receiveInvite(
+                            roomId = roomId,
+                            title = decoded.text,
+                            hostNodeId = senderNodeId,
+                            hostName = hostName,
+                            createdAt = decoded.createdAtMillis,
+                        )
+                        RoomInviteNotificationManager.postInvite(
+                            context = context,
+                            roomId = roomId,
+                            hostName = hostName,
+                            roomTitle = decoded.text,
+                        )
+                    }
+                }
+            }
+            NearbyChatPayloadKind.RoomMessage -> {
+                val roomId = decoded.roomId ?: return false
+                if (decoded.senderNodeId == localUserIdProvider()) return true
+                scope.launch {
+                    val senderName = decoded.senderDisplayName?.takeIf { it.isNotBlank() }
+                        ?: radarRepository.getProfile(senderNodeId)?.displayName
+                        ?: "Usuario cercano"
+                    roomRepository.persistIncomingMessage(
+                        roomId = roomId,
+                        senderNodeId = senderNodeId,
+                        senderName = senderName,
+                        text = decoded.text,
+                        createdAt = decoded.createdAtMillis,
+                        messageId = decoded.messageId,
+                    )
+                }
+            }
+            NearbyChatPayloadKind.FriendAdd -> {
+                scope.launch {
+                    val profile = com.example.airvibe.feature.radar.domain.model.PersonProfile(
+                        id = senderNodeId,
+                        displayName = decoded.senderDisplayName ?: "Usuario cercano",
+                        headline = decoded.senderStatus ?: "Disponible",
+                        bio = decoded.senderDetail ?: "",
+                        status = decoded.senderStatus ?: "Disponible",
+                        presence = com.example.airvibe.feature.radar.domain.model.PresenceStatus.Online,
+                        tags = decoded.senderTags,
+                        distanceMeters = 0,
+                        isFavorite = true,
+                        accentHue = 0f,
+                    )
+                    radarRepository.saveContact(profile, addedByPeer = true)
+                    com.example.airvibe.core.di.ServiceLocator.requestContactsSync()
+                }
+            }
         }
         return true
     }
 
-    /**
-     * Helper usado por tests o por el scanner para confirmar si
-     * un peer está conectado. Mantenido público para no romper
-     * el encapsulamiento desde otros archivos del paquete.
-     */
     fun isNodeReachable(nodeId: String): Boolean = nodeToEndpoint.containsKey(nodeId)
 
     private suspend fun ensureRadarNode(nodeId: String, endpointId: String) {

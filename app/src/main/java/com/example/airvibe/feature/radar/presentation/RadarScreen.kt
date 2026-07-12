@@ -25,7 +25,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -63,6 +66,9 @@ import com.example.airvibe.feature.radar.presentation.components.permissions.Per
 fun RadarScreen(
     onOpenChats: () -> Unit = {},
     onOpenChat: (String) -> Unit = {},
+    onOpenFriends: () -> Unit = {},
+    onOpenRooms: () -> Unit = {},
+    onOpenRoom: (String) -> Unit = {},
     viewModel: RadarViewModel = radarViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -71,6 +77,21 @@ fun RadarScreen(
     val ownProfileSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val broadcastSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val permissionsState = rememberRadarPermissionsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(state.lastBroadcastRoomId) {
+        state.lastBroadcastRoomId?.let { roomId ->
+            onOpenRoom(roomId)
+            viewModel.onEvent(RadarUiEvent.ConsumeBroadcastRoomNav)
+        }
+    }
+
+    LaunchedEffect(state.contactAddedMessage) {
+        state.contactAddedMessage?.let { message ->
+            snackbarHostState.showSnackbar(message)
+            viewModel.onEvent(RadarUiEvent.ConsumeContactAddedMessage)
+        }
+    }
 
     // Si el scanner falla por permisos, abrimos automáticamente el modal.
     val shouldShowPermissions = remember(state.pendingPermissionRequest, permissionsState.allGranted) {
@@ -99,6 +120,8 @@ fun RadarScreen(
                 chatCount = state.unreadChatCount,
                 onSignOut = { viewModel.onEvent(RadarUiEvent.SignOut) },
                 onOpenChats = onOpenChats,
+                onOpenFriends = onOpenFriends,
+                onOpenRooms = onOpenRooms,
                 onEditProfile = { viewModel.onEvent(RadarUiEvent.OpenOwnProfile) },
             )
 
@@ -138,6 +161,13 @@ fun RadarScreen(
                 )
             }
         }
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+                .padding(bottom = 8.dp),
+        )
     }
 
     PermissionsModal(

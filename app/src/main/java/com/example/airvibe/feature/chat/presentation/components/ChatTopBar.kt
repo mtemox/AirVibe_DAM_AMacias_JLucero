@@ -43,7 +43,9 @@ fun ChatTopBar(
     peerDisplayName: String,
     isConnected: Boolean,
     onBack: () -> Unit,
-    onMore: () -> Unit,
+    onMore: () -> Unit = {},
+    subtitle: String? = null,
+    badgeText: String = "Chat P2P",
     modifier: Modifier = Modifier,
 ) {
     val tokens = AirVibeTheme.glass
@@ -110,7 +112,7 @@ fun ChatTopBar(
                             pulse = isConnected,
                         )
                         Text(
-                            text = if (isConnected) "En línea" else "Sin conexión",
+                            text = subtitle ?: if (isConnected) "En línea" else "Sin conexión",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -118,7 +120,7 @@ fun ChatTopBar(
                 }
 
                 GlassPill(
-                    text = "Chat P2P",
+                    text = badgeText,
                     leading = {
                         Icon(
                             imageVector = Icons.Rounded.Bolt,

@@ -19,9 +19,18 @@ interface ChatMessageGateway {
 
     /**
      * Envía el mismo texto a **todos** los peers conectados.
-     * Devuelve la cantidad de peers a los que se entregó.
+     * @deprecated Usar [broadcastRoomInvite] para salas.
      */
     suspend fun broadcast(text: String): Int
+
+    /** Invita a todos los peers conectados a unirse a una sala. */
+    suspend fun broadcastRoomInvite(text: String, roomId: String): Int
+
+    /** Envía un mensaje dentro de una sala a todos los peers conectados. */
+    suspend fun sendRoomMessage(roomId: String, text: String, messageId: String): Boolean
+
+    /** Notifica a un peer que fue agregado como contacto. */
+    suspend fun sendFriendAdd(targetNodeId: String): Boolean
 
     /**
      * Persiste un mensaje entrante recibido como bytes del

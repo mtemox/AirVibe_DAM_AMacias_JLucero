@@ -22,6 +22,18 @@ interface RadarRepository {
     /** Marca/desmarca un nodo como favorito. */
     suspend fun toggleFavorite(nodeId: String): Boolean
 
+    /** Añade un nodo a amigos sin quitarlo si ya estaba. */
+    suspend fun addFavorite(nodeId: String): Boolean
+
+    /** Persiste un contacto con snapshot de perfil (también vía P2P). */
+    suspend fun saveContact(profile: PersonProfile, addedByPeer: Boolean = false): Boolean
+
+    /** Indica si el contacto está guardado de forma persistente. */
+    suspend fun isSavedContact(nodeId: String): Boolean
+
+    /** Lista reactiva de contactos guardados. */
+    fun observeFavorites(): Flow<List<PersonProfile>>
+
     /**
      * Inserta o actualiza un nodo (típicamente un peer recién
      * descubierto por Bluetooth). Si el nodo es local (generado

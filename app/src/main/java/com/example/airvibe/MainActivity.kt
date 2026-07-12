@@ -1,5 +1,6 @@
 package com.example.airvibe
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -20,50 +21,89 @@ import com.example.airvibe.feature.auth.domain.model.AuthStatus
 import com.example.airvibe.feature.auth.presentation.AuthScreen
 import com.example.airvibe.feature.chat.presentation.ChatScreen
 import com.example.airvibe.feature.chat.presentation.ConversationsListScreen
+import com.example.airvibe.feature.chat.presentation.GroupRoomScreen
+import com.example.airvibe.feature.chat.presentation.RoomsListScreen
+import com.example.airvibe.feature.radar.presentation.FriendsScreen
 import com.example.airvibe.feature.radar.presentation.RadarScreen
 import com.example.airvibe.core.di.ServiceLocator
 
 class MainActivity : ComponentActivity() {
+
+    private val deepLinkState = mutableStateOf<AppDeepLink?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        // Si la app se abrió desde una notificación de match,
-        // abrimos el chat con el peer indicado en el intent.
-        val openWithNodeId = intent?.getStringExtra(EXTRA_OPEN_CHAT_WITH_NODE_ID)
-        val fromMatch = intent?.getBooleanExtra(EXTRA_OPEN_CHAT_FROM_MATCH, false) == true
+        deepLinkState.value = parseDeepLink(intent)
         setContent {
+            val deepLink by deepLinkState
             AirVibeApp(
-                initialOpenNodeId = openWithNodeId,
-                initialFromMatch = fromMatch,
+                initialDeepLink = deepLink ?: parseDeepLink(intent),
+                onDeepLinkHandled = { deepLinkState.value = null },
             )
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        deepLinkState.value = parseDeepLink(intent)
+    }
+
+    private fun parseDeepLink(intent: Intent?): AppDeepLink? {
+        val roomId = intent?.getStringExtra(EXTRA_OPEN_ROOM_ID)
+        if (!roomId.isNullOrBlank()) return AppDeepLink.Room(roomId)
+        val nodeId = intent?.getStringExtra(EXTRA_OPEN_CHAT_WITH_NODE_ID)
+        val fromMatch = intent?.getBooleanExtra(EXTRA_OPEN_CHAT_FROM_MATCH, false) == true
+        if (fromMatch && !nodeId.isNullOrBlank()) return AppDeepLink.Chat(nodeId, fromMatch = true)
+        return null
     }
 
     companion object {
         const val EXTRA_OPEN_CHAT_WITH_NODE_ID = "airvibe.extra.OPEN_CHAT_WITH_NODE_ID"
         const val EXTRA_OPEN_CHAT_FROM_MATCH = "airvibe.extra.OPEN_CHAT_FROM_MATCH"
+        const val EXTRA_OPEN_ROOM_ID = "airvibe.extra.OPEN_ROOM_ID"
     }
 }
 
-/**
- * Router raíz de la app. Mantenemos un router state-based (sin
- * Navigation Compose) por consistencia con los pasos anteriores.
- */
+private sealed interface AppDeepLink {
+    data class Room(val roomId: String) : AppDeepLink
+    data class Chat(val nodeId: String, val fromMatch: Boolean = false) : AppDeepLink
+}
+
 @Composable
 private fun AirVibeApp(
-    initialOpenNodeId: String? = null,
-    initialFromMatch: Boolean = false,
+    initialDeepLink: AppDeepLink? = null,
+    onDeepLinkHandled: () -> Unit = {},
 ) {
     val authStatus by ServiceLocator.authRepository.status.collectAsStateWithLifecycle()
     val darkTheme = remember { false }
     var chatTarget by rememberSaveable(stateSaver = ChatTarget.Saver) {
         mutableStateOf(
-            when {
-                initialFromMatch && !initialOpenNodeId.isNullOrBlank() ->
-                    ChatTarget.ActiveChat(initialOpenNodeId)
-                else -> ChatTarget.Closed
+            when (val link = initialDeepLink) {
+                is AppDeepLink.Room -> ChatTarget.ActiveRoom(link.roomId)
+                is AppDeepLink.Chat -> ChatTarget.ActiveChat(link.nodeId)
+                null -> ChatTarget.Closed
             },
         )
+    }
+    var fromMatchNavigation by rememberSaveable {
+        mutableStateOf((initialDeepLink as? AppDeepLink.Chat)?.fromMatch == true)
+    }
+
+    LaunchedEffect(initialDeepLink) {
+        when (val link = initialDeepLink) {
+            is AppDeepLink.Room -> {
+                chatTarget = ChatTarget.ActiveRoom(link.roomId)
+                onDeepLinkHandled()
+            }
+            is AppDeepLink.Chat -> {
+                chatTarget = ChatTarget.ActiveChat(link.nodeId)
+                fromMatchNavigation = link.fromMatch
+                onDeepLinkHandled()
+            }
+            null -> Unit
+        }
     }
 
     AirVibeTheme(darkTheme = darkTheme) {
@@ -75,6 +115,9 @@ private fun AirVibeApp(
                     ChatTarget.Closed -> RadarScreen(
                         onOpenChats = { chatTarget = ChatTarget.List },
                         onOpenChat = { nodeId -> chatTarget = ChatTarget.ActiveChat(nodeId) },
+                        onOpenFriends = { chatTarget = ChatTarget.Friends },
+                        onOpenRooms = { chatTarget = ChatTarget.RoomsList },
+                        onOpenRoom = { roomId -> chatTarget = ChatTarget.ActiveRoom(roomId) },
                     )
                     ChatTarget.List -> ConversationsListScreen(
                         onBack = { chatTarget = ChatTarget.Closed },
@@ -82,35 +125,37 @@ private fun AirVibeApp(
                             chatTarget = ChatTarget.ActiveChat(nodeId)
                         },
                     )
+                    ChatTarget.Friends -> FriendsScreen(
+                        onBack = { chatTarget = ChatTarget.Closed },
+                        onOpenChat = { nodeId -> chatTarget = ChatTarget.ActiveChat(nodeId) },
+                    )
+                    ChatTarget.RoomsList -> RoomsListScreen(
+                        onBack = { chatTarget = ChatTarget.Closed },
+                        onOpenRoom = { roomId -> chatTarget = ChatTarget.ActiveRoom(roomId) },
+                    )
                     is ChatTarget.ActiveChat -> ChatScreen(
                         peerNodeId = target.peerNodeId,
                         onBack = {
-                            // Si llegamos desde una notificación,
-                            // cerramos al radar; si no, volvemos a
-                            // la lista.
-                            chatTarget = if (initialFromMatch) ChatTarget.Closed else ChatTarget.List
+                            chatTarget = if (fromMatchNavigation) ChatTarget.Closed else ChatTarget.List
                         },
+                    )
+                    is ChatTarget.ActiveRoom -> GroupRoomScreen(
+                        roomId = target.roomId,
+                        onBack = { chatTarget = ChatTarget.RoomsList },
                     )
                 }
             }
         }
     }
-
-    LaunchedEffect(Unit) {
-        // Si el usuario cierra sesión o se desuscribe, la UI
-        // vuelve automáticamente a AuthScreen porque `authStatus`
-        // cambia; no hace falta limpiar `chatTarget` manualmente
-        // (al re-entrarse al radar se reinicia a Closed).
-    }
 }
 
-/**
- * Estado de navegación dentro de la feature de chat.
- */
 sealed interface ChatTarget {
     data object Closed : ChatTarget
     data object List : ChatTarget
+    data object Friends : ChatTarget
+    data object RoomsList : ChatTarget
     data class ActiveChat(val peerNodeId: String) : ChatTarget
+    data class ActiveRoom(val roomId: String) : ChatTarget
 
     companion object {
         val Saver: androidx.compose.runtime.saveable.Saver<ChatTarget, String> =
@@ -119,15 +164,22 @@ sealed interface ChatTarget {
                     when (it) {
                         Closed -> "closed"
                         List -> "list"
+                        Friends -> "friends"
+                        RoomsList -> "rooms"
                         is ActiveChat -> "chat:${it.peerNodeId}"
+                        is ActiveRoom -> "room:${it.roomId}"
                     }
                 },
                 restore = { value ->
                     when {
                         value == "closed" -> Closed
                         value == "list" -> List
+                        value == "friends" -> Friends
+                        value == "rooms" -> RoomsList
                         value.startsWith("chat:") ->
                             ActiveChat(value.removePrefix("chat:"))
+                        value.startsWith("room:") ->
+                            ActiveRoom(value.removePrefix("room:"))
                         else -> Closed
                     }
                 },

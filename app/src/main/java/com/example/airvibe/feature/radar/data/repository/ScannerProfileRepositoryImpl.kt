@@ -3,6 +3,8 @@ package com.example.airvibe.feature.radar.data.repository
 import android.content.Context
 import android.content.SharedPreferences
 import com.example.airvibe.feature.radar.data.device.identity.DeviceIdentityProvider
+import com.example.airvibe.feature.radar.data.remote.RemoteProfileDto
+import com.example.airvibe.feature.radar.data.remote.SupabaseProfileDataSource
 import com.example.airvibe.feature.radar.domain.model.RadarNodeKind
 import com.example.airvibe.feature.radar.domain.repository.ScannerProfileRepository
 import com.example.airvibe.feature.radar.domain.scanner.ScannerProfile
@@ -14,6 +16,8 @@ import org.json.JSONArray
 class ScannerProfileRepositoryImpl(
     context: Context,
     private val deviceIdentity: DeviceIdentityProvider,
+    private val profileRemote: SupabaseProfileDataSource? = null,
+    private val currentAuthUserId: () -> String? = { null },
 ) : ScannerProfileRepository {
 
     private val prefs: SharedPreferences =
@@ -50,6 +54,32 @@ class ScannerProfileRepositoryImpl(
         val name = displayName?.trim().orEmpty()
         if (name.isEmpty()) return
         prefs.edit().putString(KEY_DISPLAY_NAME, name).apply()
+        state.value = readProfile()
+    }
+
+    override suspend fun syncToRemote(profile: ScannerProfile) {
+        val remote = profileRemote ?: return
+        val userId = currentAuthUserId() ?: return
+        remote.upsert(
+            RemoteProfileDto(
+                id = userId,
+                fullName = profile.displayName,
+                status = profile.status,
+                tags = profile.tags,
+            ),
+        )
+    }
+
+    override suspend fun restoreFromRemote(userId: String) {
+        val remote = profileRemote ?: return
+        val dto = remote.fetch(userId).getOrNull() ?: return
+        prefs.edit().apply {
+            putString(KEY_DISPLAY_NAME, dto.fullName)
+            dto.status?.takeIf { it.isNotBlank() }?.let { putString(KEY_STATUS, it) }
+            if (dto.tags.isNotEmpty()) putString(KEY_TAGS, encodeTags(dto.tags))
+            putBoolean(KEY_NAME_CUSTOMIZED, true)
+            apply()
+        }
         state.value = readProfile()
     }
 

@@ -16,14 +16,22 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.ChatBubbleOutline
+import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material.icons.rounded.Logout
+import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.PersonOutline
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -44,8 +52,12 @@ fun RadarTopBar(
     chatCount: Int = 0,
     onSignOut: (() -> Unit)? = null,
     onOpenChats: (() -> Unit)? = null,
+    onOpenFriends: (() -> Unit)? = null,
+    onOpenRooms: (() -> Unit)? = null,
     onEditProfile: (() -> Unit)? = null,
 ) {
+    var menuExpanded by remember { mutableStateOf(false) }
+
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -65,6 +77,7 @@ fun RadarTopBar(
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.weight(1f),
                 ) {
                     Box(contentAlignment = Alignment.BottomEnd) {
                         AvatarMonogram(
@@ -124,18 +137,16 @@ fun RadarTopBar(
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurface,
                         )
-                        Box(modifier = Modifier.size(6.dp)) {
-                            Icon(
-                                imageVector = Icons.Rounded.PersonOutline,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(14.dp),
-                            )
-                        }
+                        Icon(
+                            imageVector = Icons.Rounded.PersonOutline,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(14.dp),
+                        )
                     }
 
-                    if (onOpenChats != null) {
-                        val tokens = AirVibeTheme.glass
+                    val tokens = AirVibeTheme.glass
+                    Box {
                         BadgedBox(
                             badge = {
                                 if (chatCount > 0) {
@@ -156,40 +167,70 @@ fun RadarTopBar(
                                         color = tokens.outerBorder,
                                         shape = CircleShape,
                                     )
-                                    .clickable(onClick = onOpenChats),
+                                    .clickable { menuExpanded = true },
                                 contentAlignment = Alignment.Center,
                             ) {
                                 Icon(
-                                    imageVector = Icons.Rounded.ChatBubbleOutline,
-                                    contentDescription = "Chats",
+                                    imageVector = Icons.Rounded.Menu,
+                                    contentDescription = "Menú",
                                     tint = MaterialTheme.colorScheme.onSurface,
                                     modifier = Modifier.size(18.dp),
                                 )
                             }
                         }
-                    }
 
-                    if (onSignOut != null) {
-                        val tokens = AirVibeTheme.glass
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(tokens.surfaceFill)
-                                .border(
-                                    width = 1.dp,
-                                    color = tokens.outerBorder,
-                                    shape = CircleShape,
-                                )
-                                .clickable(onClick = onSignOut),
-                            contentAlignment = Alignment.Center,
+                        DropdownMenu(
+                            expanded = menuExpanded,
+                            onDismissRequest = { menuExpanded = false },
                         ) {
-                            Icon(
-                                imageVector = Icons.Rounded.Logout,
-                                contentDescription = "Cerrar sesión",
-                                tint = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.size(18.dp),
-                            )
+                            if (onOpenRooms != null) {
+                                DropdownMenuItem(
+                                    text = { Text("Salas cercanas") },
+                                    onClick = {
+                                        menuExpanded = false
+                                        onOpenRooms()
+                                    },
+                                    leadingIcon = {
+                                        Icon(Icons.Rounded.Groups, contentDescription = null)
+                                    },
+                                )
+                            }
+                            if (onOpenFriends != null) {
+                                DropdownMenuItem(
+                                    text = { Text("Mis amigos") },
+                                    onClick = {
+                                        menuExpanded = false
+                                        onOpenFriends()
+                                    },
+                                    leadingIcon = {
+                                        Icon(Icons.Rounded.PersonOutline, contentDescription = null)
+                                    },
+                                )
+                            }
+                            if (onOpenChats != null) {
+                                DropdownMenuItem(
+                                    text = { Text("Chats") },
+                                    onClick = {
+                                        menuExpanded = false
+                                        onOpenChats()
+                                    },
+                                    leadingIcon = {
+                                        Icon(Icons.Rounded.ChatBubbleOutline, contentDescription = null)
+                                    },
+                                )
+                            }
+                            if (onSignOut != null) {
+                                DropdownMenuItem(
+                                    text = { Text("Cerrar sesión") },
+                                    onClick = {
+                                        menuExpanded = false
+                                        onSignOut()
+                                    },
+                                    leadingIcon = {
+                                        Icon(Icons.Rounded.Logout, contentDescription = null)
+                                    },
+                                )
+                            }
                         }
                     }
                 }
@@ -197,4 +238,3 @@ fun RadarTopBar(
         }
     }
 }
-

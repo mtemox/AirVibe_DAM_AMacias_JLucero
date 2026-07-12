@@ -101,13 +101,13 @@ class ChatViewModel(
         val text = state.composer
         _uiState.update { it.copy(isBroadcasting = true) }
         viewModelScope.launch {
-            val count = runCatching { chatRepository.broadcast(text) }
-                .getOrDefault(0)
+            val result = runCatching { chatRepository.broadcast(text) }
+                .getOrElse { com.example.airvibe.feature.chat.domain.repository.BroadcastResult(0, "") }
             _uiState.update {
                 it.copy(
                     isBroadcasting = false,
                     composer = "",
-                    lastBroadcastCount = count,
+                    lastBroadcastCount = result.recipientCount,
                 )
             }
         }

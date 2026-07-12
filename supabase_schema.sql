@@ -65,6 +65,65 @@ CREATE INDEX IF NOT EXISTS idx_chat_messages_inbox
     ON public.chat_messages(receiver_id, sent_at DESC);
 
 -- =============================================================
+-- 4) SAVED_CONTACTS  (persistent friends list, offline-first)
+--    peer_node_id uses the Bluetooth/local device id (text).
+-- =============================================================
+CREATE TABLE IF NOT EXISTS public.saved_contacts (
+    id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    owner_id        UUID        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    peer_node_id    TEXT        NOT NULL,
+    display_name    TEXT        NOT NULL,
+    headline        TEXT        NOT NULL DEFAULT '',
+    bio             TEXT        NOT NULL DEFAULT '',
+    status          TEXT        NOT NULL DEFAULT '',
+    presence        TEXT        NOT NULL DEFAULT 'Away',
+    tags            TEXT[]      NOT NULL DEFAULT '{}',
+    accent_color_argb BIGINT    NOT NULL DEFAULT 4286619633,
+    added_by_peer   BOOLEAN     NOT NULL DEFAULT FALSE,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT saved_contacts_owner_peer_unique UNIQUE (owner_id, peer_node_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_saved_contacts_owner ON public.saved_contacts(owner_id);
+
+-- =============================================================
+-- 5) PROXIMITY_ROOMS  (optional cloud backup of room metadata)
+--    Chat en vivo sigue siendo P2P; esto guarda historial/título.
+-- =============================================================
+CREATE TABLE IF NOT EXISTS public.proximity_rooms (
+    id              TEXT        PRIMARY KEY,
+    owner_id        UUID        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    title           TEXT        NOT NULL,
+    host_node_id    TEXT        NOT NULL,
+    host_name       TEXT        NOT NULL,
+    joined          BOOLEAN     NOT NULL DEFAULT FALSE,
+    is_host         BOOLEAN     NOT NULL DEFAULT FALSE,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_proximity_rooms_owner ON public.proximity_rooms(owner_id);
+
+-- =============================================================
+-- 6) ROOM_MESSAGES  (cloud backup of group room chat history)
+--    owner_id -> authenticated user who owns this backup copy
+-- =============================================================
+CREATE TABLE IF NOT EXISTS public.room_messages (
+    id              TEXT        PRIMARY KEY,
+    owner_id        UUID        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    room_id         TEXT        NOT NULL,
+    sender_node_id  TEXT        NOT NULL,
+    sender_name     TEXT        NOT NULL,
+    content         TEXT        NOT NULL,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_room_messages_owner ON public.room_messages(owner_id);
+CREATE INDEX IF NOT EXISTS idx_room_messages_room  ON public.room_messages(room_id);
+
+-- =============================================================
 -- TRIGGER FUNCTION: auto-touch updated_at on every UPDATE
 -- Critical for offline-first conflict resolution.
 -- =============================================================
@@ -81,6 +140,9 @@ $$;
 DROP TRIGGER IF EXISTS trg_profiles_updated_at      ON public.profiles;
 DROP TRIGGER IF EXISTS trg_radar_nodes_updated_at   ON public.radar_nodes;
 DROP TRIGGER IF EXISTS trg_chat_messages_updated_at ON public.chat_messages;
+DROP TRIGGER IF EXISTS trg_saved_contacts_updated_at ON public.saved_contacts;
+DROP TRIGGER IF EXISTS trg_proximity_rooms_updated_at ON public.proximity_rooms;
+DROP TRIGGER IF EXISTS trg_room_messages_updated_at   ON public.room_messages;
 
 CREATE TRIGGER trg_profiles_updated_at
     BEFORE UPDATE ON public.profiles
@@ -94,12 +156,27 @@ CREATE TRIGGER trg_chat_messages_updated_at
     BEFORE UPDATE ON public.chat_messages
     FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
 
+CREATE TRIGGER trg_saved_contacts_updated_at
+    BEFORE UPDATE ON public.saved_contacts
+    FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+
+CREATE TRIGGER trg_proximity_rooms_updated_at
+    BEFORE UPDATE ON public.proximity_rooms
+    FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+
+CREATE TRIGGER trg_room_messages_updated_at
+    BEFORE UPDATE ON public.room_messages
+    FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+
 -- =============================================================
 -- ROW LEVEL SECURITY
 -- =============================================================
 ALTER TABLE public.profiles      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.radar_nodes   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.chat_messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.saved_contacts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.proximity_rooms ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.room_messages   ENABLE ROW LEVEL SECURITY;
 
 -- ---------- profiles: a user can only read/write their own row ----------
 DROP POLICY IF EXISTS "profiles_select_own" ON public.profiles;
@@ -168,6 +245,72 @@ CREATE POLICY "chat_messages_insert_sender"
     ON public.chat_messages FOR INSERT
     TO authenticated
     WITH CHECK (sender_id = auth.uid());
+
+-- ---------- saved_contacts: owner only ----------
+DROP POLICY IF EXISTS "saved_contacts_select_own" ON public.saved_contacts;
+DROP POLICY IF EXISTS "saved_contacts_insert_own" ON public.saved_contacts;
+DROP POLICY IF EXISTS "saved_contacts_update_own" ON public.saved_contacts;
+DROP POLICY IF EXISTS "saved_contacts_delete_own" ON public.saved_contacts;
+
+CREATE POLICY "saved_contacts_select_own"
+    ON public.saved_contacts FOR SELECT TO authenticated
+    USING (owner_id = auth.uid());
+
+CREATE POLICY "saved_contacts_insert_own"
+    ON public.saved_contacts FOR INSERT TO authenticated
+    WITH CHECK (owner_id = auth.uid());
+
+CREATE POLICY "saved_contacts_update_own"
+    ON public.saved_contacts FOR UPDATE TO authenticated
+    USING (owner_id = auth.uid()) WITH CHECK (owner_id = auth.uid());
+
+CREATE POLICY "saved_contacts_delete_own"
+    ON public.saved_contacts FOR DELETE TO authenticated
+    USING (owner_id = auth.uid());
+
+-- ---------- proximity_rooms: owner only ----------
+DROP POLICY IF EXISTS "proximity_rooms_select_own" ON public.proximity_rooms;
+DROP POLICY IF EXISTS "proximity_rooms_insert_own" ON public.proximity_rooms;
+DROP POLICY IF EXISTS "proximity_rooms_update_own" ON public.proximity_rooms;
+DROP POLICY IF EXISTS "proximity_rooms_delete_own" ON public.proximity_rooms;
+
+CREATE POLICY "proximity_rooms_select_own"
+    ON public.proximity_rooms FOR SELECT TO authenticated
+    USING (owner_id = auth.uid());
+
+CREATE POLICY "proximity_rooms_insert_own"
+    ON public.proximity_rooms FOR INSERT TO authenticated
+    WITH CHECK (owner_id = auth.uid());
+
+CREATE POLICY "proximity_rooms_update_own"
+    ON public.proximity_rooms FOR UPDATE TO authenticated
+    USING (owner_id = auth.uid()) WITH CHECK (owner_id = auth.uid());
+
+CREATE POLICY "proximity_rooms_delete_own"
+    ON public.proximity_rooms FOR DELETE TO authenticated
+    USING (owner_id = auth.uid());
+
+-- ---------- room_messages: owner only ----------
+DROP POLICY IF EXISTS "room_messages_select_own" ON public.room_messages;
+DROP POLICY IF EXISTS "room_messages_insert_own" ON public.room_messages;
+DROP POLICY IF EXISTS "room_messages_update_own" ON public.room_messages;
+DROP POLICY IF EXISTS "room_messages_delete_own" ON public.room_messages;
+
+CREATE POLICY "room_messages_select_own"
+    ON public.room_messages FOR SELECT TO authenticated
+    USING (owner_id = auth.uid());
+
+CREATE POLICY "room_messages_insert_own"
+    ON public.room_messages FOR INSERT TO authenticated
+    WITH CHECK (owner_id = auth.uid());
+
+CREATE POLICY "room_messages_update_own"
+    ON public.room_messages FOR UPDATE TO authenticated
+    USING (owner_id = auth.uid()) WITH CHECK (owner_id = auth.uid());
+
+CREATE POLICY "room_messages_delete_own"
+    ON public.room_messages FOR DELETE TO authenticated
+    USING (owner_id = auth.uid());
 
 -- =============================================================
 -- AUTO-CREATE PROFILE ON SIGNUP

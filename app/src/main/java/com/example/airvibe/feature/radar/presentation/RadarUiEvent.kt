@@ -34,9 +34,18 @@ sealed interface RadarUiEvent {
     /** Abre la bandeja de entrada de chats. */
     data object OpenChats : RadarUiEvent
 
+    /** Abre la lista de amigos guardados. */
+    data object OpenFriends : RadarUiEvent
+
     /** Abre el sheet de filtros inteligentes. */
     data object OpenMatchFilters : RadarUiEvent
 
     /** Cierra el sheet de filtros inteligentes. */
     data object DismissMatchFilters : RadarUiEvent
+
+    /** Limpia el evento de navegación tras abrir una sala creada. */
+    data object ConsumeBroadcastRoomNav : RadarUiEvent
+
+    /** Limpia el mensaje de contacto agregado tras mostrar el snackbar. */
+    data object ConsumeContactAddedMessage : RadarUiEvent
 }

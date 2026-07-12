@@ -21,4 +21,10 @@ interface ScannerProfileRepository {
 
     /** Sincroniza el nombre desde Supabase Auth si el usuario no lo editó. */
     suspend fun applyAuthDisplayName(displayName: String?)
+
+    /** Empuja el perfil editable a Supabase (tabla profiles). */
+    suspend fun syncToRemote(profile: ScannerProfile)
+
+    /** Restaura el perfil desde Supabase si existe. */
+    suspend fun restoreFromRemote(userId: String)
 }

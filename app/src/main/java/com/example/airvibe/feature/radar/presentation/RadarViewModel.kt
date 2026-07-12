@@ -8,6 +8,7 @@ import com.example.airvibe.core.di.ScannerLifecycle
 import com.example.airvibe.core.di.ServiceLocator
 import com.example.airvibe.feature.auth.domain.repository.AuthRepository
 import com.example.airvibe.feature.chat.domain.repository.ChatRepository
+import com.example.airvibe.feature.chat.domain.scanner.ChatMessageGateway
 import com.example.airvibe.feature.chat.domain.repository.MatchPreferencesRepository
 import com.example.airvibe.feature.radar.data.seed.RadarSeedData
 import com.example.airvibe.feature.radar.domain.model.PersonProfile
@@ -35,6 +36,7 @@ class RadarViewModel(
     private val authRepository: AuthRepository,
     private val matchPreferences: MatchPreferencesRepository,
     private val chatRepository: ChatRepository,
+    private val chatGateway: ChatMessageGateway = ServiceLocator.chatGateway,
     private val onSignOut: suspend () -> Result<Unit> = { ServiceLocator.authRepository.signOut() },
 ) : ViewModel() {
 
@@ -176,15 +178,22 @@ class RadarViewModel(
             RadarUiEvent.SignOut -> signOut()
             is RadarUiEvent.UpdateOwnProfile -> updateOwnProfile(event.profile)
             RadarUiEvent.OpenChats -> Unit
+            RadarUiEvent.OpenFriends -> Unit
             RadarUiEvent.OpenMatchFilters -> _uiState.update { it.copy(isMatchFiltersVisible = true) }
             RadarUiEvent.DismissMatchFilters -> _uiState.update { it.copy(isMatchFiltersVisible = false) }
             RadarUiEvent.OpenOwnProfile -> _uiState.update { it.copy(isOwnProfileVisible = true) }
             RadarUiEvent.DismissOwnProfile -> _uiState.update { it.copy(isOwnProfileVisible = false) }
             RadarUiEvent.OpenBroadcast -> _uiState.update { it.copy(isBroadcastVisible = true) }
             RadarUiEvent.DismissBroadcast -> _uiState.update {
-                it.copy(isBroadcastVisible = false, lastBroadcastCount = 0)
+                it.copy(isBroadcastVisible = false, lastBroadcastCount = 0, lastBroadcastRoomId = null)
             }
             is RadarUiEvent.SendBroadcast -> sendBroadcast(event.text)
+            RadarUiEvent.ConsumeBroadcastRoomNav -> _uiState.update {
+                it.copy(lastBroadcastRoomId = null, isBroadcastVisible = false)
+            }
+            RadarUiEvent.ConsumeContactAddedMessage -> _uiState.update {
+                it.copy(contactAddedMessage = null)
+            }
         }
     }
 
@@ -263,12 +272,29 @@ class RadarViewModel(
     private fun addToContacts() {
         viewModelScope.launch {
             val nodeId = _uiState.value.selectedNode?.id ?: return@launch
-            repository.toggleFavorite(nodeId)
+            val added = repository.addFavorite(nodeId)
+            if (added) {
+                chatGateway.sendFriendAdd(nodeId)
+                ServiceLocator.requestContactsSync()
+                val profile = repository.getProfile(nodeId)
+                _uiState.update {
+                    it.copy(
+                        selectedProfile = profile ?: it.selectedProfile,
+                        contactAddedMessage = "${it.selectedNode?.displayName ?: "Contacto"} agregado a amigos",
+                    )
+                }
+            }
         }
     }
 
     private fun toggleFavorite() {
-        addToContacts()
+        viewModelScope.launch {
+            val nodeId = _uiState.value.selectedNode?.id ?: return@launch
+            repository.toggleFavorite(nodeId)
+            ServiceLocator.requestContactsSync()
+            val profile = repository.getProfile(nodeId)
+            _uiState.update { it.copy(selectedProfile = profile ?: it.selectedProfile) }
+        }
     }
 
     private fun updateOwnProfile(profile: ScannerProfile) {
@@ -280,12 +306,8 @@ class RadarViewModel(
             profileRepository.update(displayName, status, tags)
             val updated = profileRepository.current()
             runCatching { scanner.updateProfile(updated) }
-            if (_uiState.value.isScanning) {
-                runCatching {
-                    scannerLifecycle.execute(ScannerLifecycle.Action.Stop)
-                    scannerLifecycle.execute(ScannerLifecycle.Action.Start)
-                }
-            }
+            runCatching { profileRepository.syncToRemote(updated) }
+            ServiceLocator.requestContactsSync()
             _uiState.update { it.copy(isOwnProfileVisible = false) }
         }
     }
@@ -293,11 +315,13 @@ class RadarViewModel(
     private fun sendBroadcast(text: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isBroadcasting = true) }
-            val count = runCatching { chatRepository.broadcast(text) }.getOrDefault(0)
+            val result = runCatching { chatRepository.broadcast(text) }
+                .getOrElse { com.example.airvibe.feature.chat.domain.repository.BroadcastResult(0, "") }
             _uiState.update {
                 it.copy(
                     isBroadcasting = false,
-                    lastBroadcastCount = count,
+                    lastBroadcastCount = result.recipientCount,
+                    lastBroadcastRoomId = result.roomId.takeIf { id -> id.isNotBlank() },
                 )
             }
         }

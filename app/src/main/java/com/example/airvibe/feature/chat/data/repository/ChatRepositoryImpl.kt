@@ -7,8 +7,10 @@ import com.example.airvibe.feature.chat.data.mapper.ChatMessageMapper.toSummary
 import com.example.airvibe.feature.chat.domain.model.ChatMessage
 import com.example.airvibe.feature.chat.domain.model.MessageKind
 import com.example.airvibe.feature.chat.domain.model.MessageStatus
+import com.example.airvibe.feature.chat.domain.repository.BroadcastResult
 import com.example.airvibe.feature.chat.domain.repository.ChatRepository
 import com.example.airvibe.feature.chat.domain.repository.ConversationSummary
+import com.example.airvibe.feature.chat.domain.repository.ProximityRoomRepository
 import com.example.airvibe.feature.chat.domain.scanner.ChatMessageGateway
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -36,7 +38,9 @@ import java.util.UUID
 class ChatRepositoryImpl(
     private val chatDao: ChatDao,
     private val gateway: ChatMessageGateway,
+    private val roomRepository: ProximityRoomRepository,
     private val localUserIdProvider: () -> String,
+    private val localDisplayNameProvider: () -> String,
 ) : ChatRepository {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -84,30 +88,35 @@ class ChatRepositoryImpl(
         return outgoing.copy(status = finalStatus)
     }
 
-    override suspend fun broadcast(text: String): Int {
+    override suspend fun broadcast(text: String): BroadcastResult {
         val trimmed = text.trim()
         require(trimmed.isNotEmpty()) { "broadcast: text cannot be blank" }
-        val localUserId = localUserIdProvider()
-
-        // Reutilizamos el gateway para enumerar los peers y
-        // enviar. Internamente el gateway persiste los mensajes
-        // salientes por cada peer.
-        return try {
-            gateway.broadcast(trimmed)
-        } catch (t: Throwable) {
+        val hostId = localUserIdProvider()
+        val hostName = localDisplayNameProvider()
+        val room = roomRepository.createHostRoom(
+            title = trimmed,
+            hostNodeId = hostId,
+            hostName = hostName,
+        )
+        val count = try {
+            gateway.broadcastRoomInvite(trimmed, room.id)
+        } catch (_: Throwable) {
             0
-        }.also {
-            // Nota: el gateway ya persiste un mensaje Outgoing
-            // por cada peer. Este método sólo reporta el conteo
-            // al ViewModel. Lo dejamos como recordatorio del
-            // `localUserId` para futuras analíticas.
-            @Suppress("UNUSED_VARIABLE")
-            val unused = localUserId
         }
+        return BroadcastResult(recipientCount = count, roomId = room.id)
     }
 
     override suspend fun clearConversation(peerNodeId: String) {
         chatDao.clearByNode(peerNodeId)
+    }
+
+    override suspend fun sendRoomMessage(
+        roomId: String,
+        text: String,
+    ): com.example.airvibe.feature.chat.domain.model.RoomMessage {
+        val message = roomRepository.insertOutgoingMessage(roomId, text)
+        gateway.sendRoomMessage(roomId, message.text, message.id)
+        return message
     }
 
     /**

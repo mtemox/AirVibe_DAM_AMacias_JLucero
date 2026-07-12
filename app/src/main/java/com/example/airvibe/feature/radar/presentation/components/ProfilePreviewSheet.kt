@@ -245,11 +245,12 @@ fun ProfilePreviewContent(
                 modifier = Modifier.weight(1f),
             )
             LiquidGlassButton(
-                text = "Agregar",
+                text = if (profile.isFavorite) "En amigos" else "Agregar",
                 onClick = onAddContact,
                 icon = Icons.Rounded.PersonAddAlt,
                 variant = LiquidGlassVariant.Secondary,
                 modifier = Modifier.weight(1f),
+                enabled = !profile.isFavorite,
             )
         }
 

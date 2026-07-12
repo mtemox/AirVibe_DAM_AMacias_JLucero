@@ -39,12 +39,12 @@ fun BroadcastSheet(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text(
-            text = "Broadcast a sala cercana",
+            text = "Crear sala cercana",
             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
             color = MaterialTheme.colorScheme.onSurface,
         )
         Text(
-            text = "Envía una invitación a todos los peers conectados por Bluetooth.",
+            text = "Los usuarios cercanos recibirán una notificación para unirse. No se envía un mensaje privado invasivo.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -52,13 +52,13 @@ fun BroadcastSheet(
         GlassTextField(
             value = message,
             onValueChange = { message = it },
-            label = "Mensaje de invitación",
+            label = "Nombre o tema de la sala",
             modifier = Modifier.fillMaxWidth(),
         )
 
         if (lastBroadcastCount > 0) {
             Text(
-                text = "Entregado a $lastBroadcastCount dispositivo(s).",
+                text = "Invitación enviada a $lastBroadcastCount dispositivo(s).",
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.tertiary,
             )
@@ -67,7 +67,7 @@ fun BroadcastSheet(
         Spacer(modifier = Modifier.height(4.dp))
 
         LiquidGlassButton(
-            text = if (isBroadcasting) "Enviando..." else "Enviar broadcast",
+            text = if (isBroadcasting) "Creando sala..." else "Crear sala",
             onClick = {
                 val trimmed = message.trim()
                 if (trimmed.isNotEmpty()) onBroadcast(trimmed)

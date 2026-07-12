@@ -48,4 +48,11 @@
     <string name="match_channel_description">Te avisamos cuando encontramos un peer cercano que coincide con tus intereses.</string>
     <string name="match_notification_title">¡Hay un match cerca de ti!</string>
     <string name="match_notification_body">Se encontró %1$s cerca de ti (coincide con \"%2$s\").</string>
+
+    <!-- Room invite notifications -->
+    <string name="room_invite_channel_name">Salas cercanas</string>
+    <string name="room_invite_channel_description">Te avisamos cuando alguien cerca crea una sala para chatear en grupo.</string>
+    <string name="room_invite_notification_title">%1$s creó una sala cercana</string>
+    <string name="room_invite_notification_body">Únete para chatear: %1$s</string>
+    <string name="room_invite_action_join">Unirse</string>
 </resources>

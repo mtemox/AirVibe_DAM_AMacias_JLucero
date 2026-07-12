@@ -53,6 +53,7 @@ fun ChatComposer(
     enabled: Boolean,
     isSending: Boolean,
     isBroadcasting: Boolean,
+    showBroadcast: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     val tokens = AirVibeTheme.glass
@@ -72,13 +73,15 @@ fun ChatComposer(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.fillMaxWidth(),
         ) {
-            ComposerActionIcon(
-                icon = Icons.Rounded.BroadcastOnPersonal,
-                enabled = enabled && !isBroadcasting,
-                highlighted = isBroadcasting,
-                contentDescription = "Enviar a todos",
-                onClick = onBroadcast,
-            )
+            if (showBroadcast) {
+                ComposerActionIcon(
+                    icon = Icons.Rounded.BroadcastOnPersonal,
+                    enabled = enabled && !isBroadcasting,
+                    highlighted = isBroadcasting,
+                    contentDescription = "Enviar a todos",
+                    onClick = onBroadcast,
+                )
+            }
 
             Box(
                 modifier = Modifier

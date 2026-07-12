@@ -17,22 +17,12 @@ import kotlinx.coroutines.flow.first
 import java.util.concurrent.TimeUnit
 
 /**
- * `CoroutineWorker` que sincroniza la base de datos local con
- * Supabase. Se ejecuta en background de forma periódica
- * (típicamente cada 15 minutos) o cuando el usuario lo solicita
- * de forma explícita desde la UI.
+ * Worker que sincroniza la base de datos local con Supabase.
  *
  * Flujo:
- *
- *  1. Lee todos los nodos donde `is_synced = 0` desde Room.
- *  2. Los convierte a [com.example.airvibe.feature.radar.domain.remote.RemoteNode]
- *     y los envía al backend con `upsert` + `onConflict = id`.
- *  3. Si la subida es exitosa, marca esos registros como
- *     `is_synced = 1` en Room.
- *
- * El worker está diseñado para ser **idempotente**: si se vuelve
- * a encolar, los nodos ya sincronizados se omiten automáticamente
- * (porque Room filtra por `is_synced = 0`).
+ *  1. Restaura salas, mensajes de sala y amigos desde la nube.
+ *  2. Sube nodos del radar pendientes.
+ *  3. Sube amigos, salas y mensajes de sala pendientes.
  */
 class SyncWorker(
     appContext: Context,
@@ -40,29 +30,45 @@ class SyncWorker(
 ) : CoroutineWorker(appContext, workerParams) {
 
     override suspend fun doWork(): Result {
+        val userId = ServiceLocator.authRepository.currentUser.value?.id
+            ?: return Result.success()
+
+        val cloudSync = ServiceLocator.cloudSyncService
+
+        // Pull primero para recuperar datos tras reinstalación
+        val restoreOutcome = cloudSync.restoreFromRemote(userId)
+        if (restoreOutcome.isFailure) {
+            val error = restoreOutcome.exceptionOrNull()
+            if (error.isRetryable()) return Result.retry()
+        }
+
+        // Push radar nodes
         val radarDao = ServiceLocator.radarDao
         val remote: RemoteNodeDataSource = ServiceLocator.remoteNodeDataSource
+        val pendingNodes = radarDao.observePendingSync().first()
+        if (pendingNodes.isNotEmpty()) {
+            val remoteNodes = pendingNodes.map { it.toRemoteNode() }
+            val nodeOutcome = remote.upsert(remoteNodes)
+            val syncedIds = nodeOutcome.getOrNull()
+            if (syncedIds != null) {
+                radarDao.markAsSynced(syncedIds)
+            } else {
+                val error = nodeOutcome.exceptionOrNull()
+                if (error.isRetryable()) return Result.retry()
+            }
+        }
 
-        val pending = radarDao.observePendingSync().first()
-        if (pending.isEmpty()) return Result.success()
-
-        val remoteNodes = pending.map { it.toRemoteNode() }
-        val outcome = remote.upsert(remoteNodes)
-        val syncedIds = outcome.getOrNull()
-        return if (syncedIds != null) {
-            radarDao.markAsSynced(syncedIds)
+        // Push contacts, rooms, room messages
+        val pushOutcome = cloudSync.pushPending(userId)
+        return if (pushOutcome.isSuccess) {
             Result.success()
         } else {
-            val error = outcome.exceptionOrNull()
+            val error = pushOutcome.exceptionOrNull()
             if (error.isRetryable()) Result.retry() else Result.failure()
         }
     }
 }
 
-/**
- * Helper para distinguir errores recuperables de los que no lo
- * son (por ejemplo, 4xx que no se van a resolver con un retry).
- */
 private fun Throwable?.isRetryable(): Boolean = when (this) {
     null -> false
     is java.io.IOException -> true
@@ -75,31 +81,17 @@ private fun Throwable?.isRetryable(): Boolean = when (this) {
     }
 }
 
-/**
- * Planificador del trabajo de sincronización. Centraliza las
- * constraints y la política de encolamiento para que el resto de
- * la app solo tenga que llamar a [requestNow] o
- * [ensurePeriodic].
- */
 object SyncScheduler {
 
     const val UNIQUE_ONE_TIME = "airvibe.sync.once"
     const val UNIQUE_PERIODIC = "airvibe.sync.periodic"
 
-    /**
-     * Constraints del worker. Pedimos Wi-Fi (UNMETERED) para no
-     * consumir datos móviles; si esto es demasiado restrictivo
-     * para el contexto del usuario (ej. sólo tiene datos), se
-     * puede cambiar a [NetworkType.CONNECTED] sin más
-     * consecuencias.
-     */
     private val constraints: Constraints
         get() = Constraints.Builder()
-            .setRequiredNetworkType(NetworkType.UNMETERED)
+            .setRequiredNetworkType(NetworkType.CONNECTED)
             .setRequiresBatteryNotLow(true)
             .build()
 
-    /** Dispara una sincronización inmediata (ignora el periodic). */
     fun requestNow() {
         val request = OneTimeWorkRequestBuilder<SyncWorker>()
             .setConstraints(constraints)
@@ -108,11 +100,6 @@ object SyncScheduler {
             .enqueueUniqueWork(UNIQUE_ONE_TIME, ExistingWorkPolicy.REPLACE, request)
     }
 
-    /**
-     * Asegura que haya un trabajo periódico encolado. Usa
-     * [ExistingPeriodicWorkPolicy.KEEP] para no reiniciar el
-     * ciclo si ya existe uno.
-     */
     fun ensurePeriodic() {
         val request = PeriodicWorkRequestBuilder<SyncWorker>(15, TimeUnit.MINUTES)
             .setConstraints(constraints)
@@ -126,7 +113,6 @@ object SyncScheduler {
             )
     }
 
-    /** Cancela los trabajos de sincronización. */
     fun cancelAll() {
         val wm = WorkManager.getInstance(SyncSchedulerApp.context)
         wm.cancelUniqueWork(UNIQUE_ONE_TIME)
@@ -134,12 +120,6 @@ object SyncScheduler {
     }
 }
 
-/**
- * Holder del [Context] de la aplicación. Se inicializa desde
- * [com.example.airvibe.AirVibeApplication.onCreate]. Mantenerlo
- * aquí evita que `SyncScheduler` (un object) tenga que recibir
- * un Context en cada llamada.
- */
 internal object SyncSchedulerApp {
     @Volatile
     private var _context: Context? = null
