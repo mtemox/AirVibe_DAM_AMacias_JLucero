@@ -125,16 +125,19 @@ private fun AirVibeApp(
                 }
                 AuthStatus.SignedIn -> when (val target = chatTarget) {
                     ChatTarget.Closed -> com.example.airvibe.feature.main.presentation.MainScreen(
-                        radarContent = {
+                        radarContent = { onMenuClick ->
                             com.example.airvibe.feature.radar.presentation.RadarChatsScreen(
-                                onOpenChat = { nodeId -> chatTarget = ChatTarget.ActiveChat(nodeId) }
+                                onOpenChat = { nodeId -> chatTarget = ChatTarget.ActiveChat(nodeId) },
+                                onMenuClick = onMenuClick
                             )
                         },
                         servicesContent = {
                             com.example.airvibe.feature.services.presentation.ServicesScreen()
                         },
                         groupsContent = {
-                            com.example.airvibe.feature.groups.presentation.GroupsScreen()
+                            com.example.airvibe.feature.groups.presentation.GroupsScreen(
+                                onOpenRoom = { roomId -> chatTarget = ChatTarget.ActiveRoom(roomId) }
+                            )
                         },
                         profileContent = {
                             com.example.airvibe.feature.profile.presentation.ProfileScreen()
@@ -156,13 +159,11 @@ private fun AirVibeApp(
                     )
                     is ChatTarget.ActiveChat -> ChatScreen(
                         peerNodeId = target.peerNodeId,
-                        onBack = {
-                            chatTarget = if (fromMatchNavigation) ChatTarget.Closed else ChatTarget.List
-                        },
+                        onBack = { chatTarget = ChatTarget.Closed },
                     )
                     is ChatTarget.ActiveRoom -> GroupRoomScreen(
                         roomId = target.roomId,
-                        onBack = { chatTarget = ChatTarget.RoomsList },
+                        onBack = { chatTarget = ChatTarget.Closed },
                     )
                 }
             }

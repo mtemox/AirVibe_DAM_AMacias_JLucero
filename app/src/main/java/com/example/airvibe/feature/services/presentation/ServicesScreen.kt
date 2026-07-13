@@ -3,6 +3,7 @@ package com.example.airvibe.feature.services.presentation
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,43 +32,39 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.airvibe.R
 
 data class ServiceCategory(val name: String, val isSelected: Boolean = false)
+
 data class ServiceProvider(
     val name: String,
     val profession: String,
     val rating: String,
     val reviews: Int,
     val distance: String,
-    val isAvailable: Boolean = true
-)
-
-val mockCategories = listOf(
-    ServiceCategory("Electricista", true),
-    ServiceCategory("Albañil"),
-    ServiceCategory("Plomero"),
-    ServiceCategory("Limpieza"),
-    ServiceCategory("Carpintero")
-)
-
-val mockProviders = listOf(
-    ServiceProvider("Carlos Rivera", "Master Electrician • 10+ yrs", "4.9", 120, "15m"),
-    ServiceProvider("Miguel Torres", "Residential Wiring", "4.7", 85, "320m"),
-    ServiceProvider("Ana Gomez", "Commercial Electrical", "4.8", 92, "1.2km", isAvailable = false)
+    val isAvailable: Boolean = true,
 )
 
 @Composable
-fun ServicesScreen() {
+fun ServicesScreen(
+    viewModel: ServicesViewModel = viewModel(),
+) {
+    val categories by viewModel.categories.collectAsStateWithLifecycle()
+    val providers by viewModel.providers.collectAsStateWithLifecycle()
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -111,15 +108,17 @@ fun ServicesScreen() {
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             item { Spacer(modifier = Modifier.width(8.dp)) }
-            items(mockCategories) { category ->
+            items(categories) { category ->
                 Surface(
                     color = if (category.isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
                     shape = CircleShape,
-                    modifier = Modifier.border(
-                        1.dp,
-                        if (category.isSelected) Color.Transparent else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
-                        CircleShape
-                    )
+                    modifier = Modifier
+                        .border(
+                            1.dp,
+                            if (category.isSelected) Color.Transparent else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+                            CircleShape
+                        )
+                        .clickable { viewModel.onCategorySelected(category.name) }
                 ) {
                     Text(
                         text = category.name,
@@ -147,7 +146,7 @@ fun ServicesScreen() {
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = "Found 12 available near you",
+                    text = "Found ${providers.size} available near you",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -176,12 +175,15 @@ fun ServicesScreen() {
             contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            items(mockProviders) { provider ->
+            items(providers) { provider ->
                 Card(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                     border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)),
                     shape = RoundedCornerShape(16.dp),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { viewModel.onContactProvider(provider) }
                 ) {
                     Row(
                         modifier = Modifier
@@ -246,9 +248,9 @@ fun ServicesScreen() {
                                     }
                                 }
                             }
-                            
+
                             Spacer(modifier = Modifier.height(4.dp))
-                            
+
                             Text(
                                 text = provider.profession,
                                 style = MaterialTheme.typography.bodyMedium,

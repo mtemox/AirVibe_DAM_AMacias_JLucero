@@ -58,7 +58,7 @@ Para la pantalla de `ChatScreen`, que ya poseía lógica funcional conectada a R
 Dado que esta iteración fue 100% enfocada a la interfaz de usuario (UI), queda pendiente realizar la conexión ("Hook up") con la lógica de negocio (UX/Data). 
 
 ### UI/UX faltante:
-1. **Expansión del Radar:** Hacer que al tocar el componente del Radar en `RadarChatsScreen`, este ocupe el 100% de la pantalla para realizar búsquedas profundas, ocultando temporalmente la lista de chats.
+1. **Expansión y Resize del Radar/Chats:** Hacer que al tocar el componente del Radar en `RadarChatsScreen`, este ocupe el 100% de la pantalla para realizar búsquedas profundas. De igual manera, se debe poder hacer un *resize* (arrastrar hacia arriba) la lista de los chats desde su "Draggable Handle" para esconder el radar.
 2. **Animaciones de transición:** Añadir transiciones suaves (Fade in/out, Slide) al navegar entre las opciones del menú inferior.
 
 ### Lógica de negocio faltante (Conectar datos reales a la UI):

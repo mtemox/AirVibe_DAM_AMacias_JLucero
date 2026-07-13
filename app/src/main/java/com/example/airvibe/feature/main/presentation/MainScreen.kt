@@ -21,6 +21,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 
+import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.rememberDrawerState
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import com.example.airvibe.feature.main.presentation.components.DrawerContent
+
 enum class MainTab(val title: String, val icon: ImageVector) {
     Radar("Radar", Icons.Rounded.Home),
     Services("Servicios", Icons.Rounded.Search),
@@ -30,33 +37,44 @@ enum class MainTab(val title: String, val icon: ImageVector) {
 
 @Composable
 fun MainScreen(
-    radarContent: @Composable () -> Unit,
+    radarContent: @Composable (onMenuClick: () -> Unit) -> Unit,
     servicesContent: @Composable () -> Unit,
     groupsContent: @Composable () -> Unit,
     profileContent: @Composable () -> Unit,
 ) {
     var currentTab by remember { mutableStateOf(MainTab.Radar) }
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
 
-    Scaffold(
-        bottomBar = {
-            NavigationBar {
-                MainTab.values().forEach { tab ->
-                    NavigationBarItem(
-                        selected = currentTab == tab,
-                        onClick = { currentTab = tab },
-                        icon = { Icon(imageVector = tab.icon, contentDescription = tab.title) },
-                        label = { Text(text = tab.title, fontWeight = FontWeight.SemiBold) }
-                    )
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            DrawerContent()
+        }
+    ) {
+        Scaffold(
+            bottomBar = {
+                NavigationBar {
+                    MainTab.values().forEach { tab ->
+                        NavigationBarItem(
+                            selected = currentTab == tab,
+                            onClick = { currentTab = tab },
+                            icon = { Icon(imageVector = tab.icon, contentDescription = tab.title) },
+                            label = { Text(text = tab.title, fontWeight = FontWeight.SemiBold) }
+                        )
+                    }
                 }
             }
-        }
-    ) { paddingValues ->
-        Box(modifier = Modifier.padding(paddingValues)) {
-            when (currentTab) {
-                MainTab.Radar -> radarContent()
-                MainTab.Services -> servicesContent()
-                MainTab.Groups -> groupsContent()
-                MainTab.Profile -> profileContent()
+        ) { paddingValues ->
+            Box(modifier = Modifier.padding(paddingValues)) {
+                when (currentTab) {
+                    MainTab.Radar -> radarContent {
+                        scope.launch { drawerState.open() }
+                    }
+                    MainTab.Services -> servicesContent()
+                    MainTab.Groups -> groupsContent()
+                    MainTab.Profile -> profileContent()
+                }
             }
         }
     }

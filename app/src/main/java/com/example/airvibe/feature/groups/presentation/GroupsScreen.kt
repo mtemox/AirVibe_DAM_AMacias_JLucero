@@ -1,5 +1,6 @@
 package com.example.airvibe.feature.groups.presentation
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -21,10 +22,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.Devices
 import androidx.compose.material.icons.rounded.Group
 import androidx.compose.material.icons.rounded.Menu
-import androidx.compose.material.icons.rounded.Restaurant
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Card
@@ -34,11 +33,14 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -46,6 +48,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
@@ -54,9 +57,22 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.airvibe.R
+import com.example.airvibe.core.designsystem.modifiers.glassBlur
+import com.example.airvibe.core.designsystem.modifiers.glassShadow
+import com.example.airvibe.core.designsystem.theme.AirVibeTheme
+import com.example.airvibe.feature.chat.domain.model.ProximityRoom
+import com.example.airvibe.feature.chat.presentation.RoomsListViewModel
+import com.example.airvibe.feature.radar.presentation.components.BroadcastSheet
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 
 data class MockGroup(
+    val id: String,
     val name: String,
     val time: String,
     val members: String,
@@ -66,22 +82,38 @@ data class MockGroup(
     val hasUnread: Boolean = false
 )
 
-val mockGroups = listOf(
-    MockGroup("Hiking Enthusiasts", "12:45 PM", "1,204 active members nearby", hasUnread = true),
-    MockGroup("Local Tech Swap", "Yesterday", "85 active members nearby", icon = Icons.Rounded.Devices, iconBgColor = Color(0xFFEFF6FF), iconTintColor = Color(0xFF4166F5)),
-    MockGroup("Morning Yoga Vibe", "Tuesday", "312 active members nearby"),
-    MockGroup("Downtown Foodies", "Mar 15", "5,000+ active members nearby", icon = Icons.Rounded.Restaurant, iconBgColor = Color(0xFFFFF7ED), iconTintColor = Color(0xFFEA580C))
-)
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun GroupsScreen() {
+fun GroupsScreen(
+    onOpenRoom: (String) -> Unit = {},
+    viewModel: RoomsListViewModel = viewModel(),
+) {
+    val rooms by viewModel.rooms.collectAsStateWithLifecycle()
+    val isCreating by viewModel.isCreating.collectAsStateWithLifecycle()
+    val newRoomId by viewModel.newRoomId.collectAsStateWithLifecycle()
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val primaryContainerColor = MaterialTheme.colorScheme.primaryContainer
+    val groups = remember(rooms, primaryColor, primaryContainerColor) {
+        rooms.map { it.toMockGroup(primaryColor, primaryContainerColor) }
+    }
+
     var searchQuery by remember { mutableStateOf("") }
+    var isCreateSheetVisible by remember { mutableStateOf(false) }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    LaunchedEffect(newRoomId) {
+        val id = newRoomId
+        if (!id.isNullOrBlank()) {
+            viewModel.consumeNewRoomId()
+            isCreateSheetVisible = false
+            onOpenRoom(id)
+        }
+    }
 
     Scaffold(
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { /* TODO */ },
+                onClick = { isCreateSheetVisible = true },
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = Color.White,
                 shape = RoundedCornerShape(16.dp)
@@ -129,7 +161,7 @@ fun GroupsScreen() {
                     leadingIcon = { Icon(imageVector = Icons.Rounded.Search, contentDescription = "Search", tint = MaterialTheme.colorScheme.outline) },
                     modifier = Modifier.fillMaxWidth(),
                     shape = CircleShape,
-                    colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                    colors = OutlinedTextFieldDefaults.colors(
                         focusedContainerColor = Color.White,
                         unfocusedContainerColor = Color.White,
                         focusedBorderColor = MaterialTheme.colorScheme.primary,
@@ -145,13 +177,13 @@ fun GroupsScreen() {
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                items(mockGroups) { group ->
+                items(items = groups, key = { it.id }) { group ->
                     Card(
                         colors = CardDefaults.cardColors(containerColor = Color.White),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
                         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
                         shape = RoundedCornerShape(16.dp),
-                        modifier = Modifier.fillMaxWidth().clickable { }
+                        modifier = Modifier.fillMaxWidth().clickable { onOpenRoom(group.id) }
                     ) {
                         Row(
                             modifier = Modifier
@@ -164,7 +196,7 @@ fun GroupsScreen() {
                                 modifier = Modifier
                                     .size(56.dp)
                                     .clip(CircleShape)
-                                    .background(if (group.icon != null) group.iconBgColor else Color.LightGray)
+                                    .background(group.iconBgColor)
                                     .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f), CircleShape),
                                 contentAlignment = Alignment.Center
                             ) {
@@ -232,5 +264,76 @@ fun GroupsScreen() {
                 }
             }
         }
+    }
+
+    if (isCreateSheetVisible) {
+        ModalBottomSheet(
+            onDismissRequest = { if (!isCreating) isCreateSheetVisible = false },
+            sheetState = sheetState,
+            containerColor = Color.Transparent,
+            scrimColor = Color.Black.copy(alpha = 0.45f),
+            dragHandle = null,
+        ) {
+            val sheetShape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)
+            BroadcastSheet(
+                isBroadcasting = isCreating,
+                lastBroadcastCount = 0,
+                onBroadcast = { name -> viewModel.createRoom(name) },
+                onDismiss = { if (!isCreating) isCreateSheetVisible = false },
+                modifier = Modifier
+                    .clip(sheetShape)
+                    .background(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                AirVibeTheme.glass.surfaceFillStrong,
+                                MaterialTheme.colorScheme.surface,
+                            ),
+                        ),
+                    )
+                    .glassShadow(
+                        color = AirVibeTheme.glass.shadowColor,
+                        cornerRadius = 0.dp,
+                    )
+                    .glassBlur(radius = 28.dp, shape = sheetShape)
+                    .fillMaxWidth(),
+            )
+        }
+    }
+}
+
+private fun ProximityRoom.toMockGroup(
+    primaryColor: Color,
+    primaryContainerColor: Color,
+): MockGroup = MockGroup(
+    id = id,
+    name = title,
+    time = createdAt.toGroupTimestamp(),
+    members = if (isHost) "Eres el anfitrión" else "Anfitrión: $hostName",
+    icon = Icons.Rounded.Group,
+    iconBgColor = primaryContainerColor,
+    iconTintColor = primaryColor,
+    hasUnread = !joined,
+)
+
+private fun Long.toGroupTimestamp(): String {
+    val now = System.currentTimeMillis()
+    val diff = now - this
+    if (diff < 0L) return ""
+
+    val nowCal = Calendar.getInstance().apply { timeInMillis = now }
+    val thenCal = Calendar.getInstance().apply { timeInMillis = this@toGroupTimestamp }
+
+    val sameDay = nowCal.get(Calendar.YEAR) == thenCal.get(Calendar.YEAR) &&
+        nowCal.get(Calendar.DAY_OF_YEAR) == thenCal.get(Calendar.DAY_OF_YEAR)
+    val yesterday = nowCal.apply { add(Calendar.DAY_OF_YEAR, -1) }
+    val sameYesterday = yesterday.get(Calendar.YEAR) == thenCal.get(Calendar.YEAR) &&
+        yesterday.get(Calendar.DAY_OF_YEAR) == thenCal.get(Calendar.DAY_OF_YEAR)
+    val sameYear = nowCal.get(Calendar.YEAR) == thenCal.get(Calendar.YEAR)
+
+    return when {
+        sameDay -> SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(this))
+        sameYesterday -> "Yesterday"
+        sameYear -> SimpleDateFormat("MMM d", Locale.getDefault()).format(Date(this))
+        else -> SimpleDateFormat("MM/dd/yy", Locale.getDefault()).format(Date(this))
     }
 }
