@@ -63,23 +63,13 @@ fun MessageBubble(
     }
 
     val bubbleBrush = if (isOutgoing) {
-        Brush.linearGradient(
-            colors = listOf(
-                MaterialTheme.colorScheme.primary.copy(alpha = 0.95f),
-                MaterialTheme.colorScheme.primary.copy(alpha = 0.75f),
-            ),
-        )
+        androidx.compose.ui.graphics.SolidColor(Color(0xFF4166F5))
     } else {
-        Brush.verticalGradient(
-            colors = listOf(
-                tokens.surfaceFillStrong,
-                tokens.surfaceFill,
-            ),
-        )
+        androidx.compose.ui.graphics.SolidColor(Color(0xFFF0F5F9))
     }
 
     val textColor = if (isOutgoing) {
-        MaterialTheme.colorScheme.onPrimary
+        Color.White
     } else {
         MaterialTheme.colorScheme.onSurface
     }

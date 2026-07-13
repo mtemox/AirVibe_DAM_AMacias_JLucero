@@ -11,6 +11,7 @@ import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.auth.status.SessionStatus
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -49,10 +50,12 @@ class SupabaseAuthRepository(
             } else {
                 null
             }
-            when (newStatus) {
-                AuthStatus.SignedIn -> onSignedIn()
-                AuthStatus.SignedOut -> onSignedOut()
-                AuthStatus.Loading -> Unit
+            scope.launch {
+                when (newStatus) {
+                    AuthStatus.SignedIn -> onSignedIn()
+                    AuthStatus.SignedOut -> onSignedOut()
+                    AuthStatus.Loading -> Unit
+                }
             }
         }
         .stateIn(scope, SharingStarted.Eagerly, AuthStatus.Loading)

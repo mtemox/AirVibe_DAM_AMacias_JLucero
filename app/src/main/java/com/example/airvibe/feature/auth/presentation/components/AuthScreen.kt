@@ -4,329 +4,318 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.Login
-import androidx.compose.material.icons.rounded.PersonAddAlt
-import androidx.compose.material.icons.rounded.Radar
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.Mail
+import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.example.airvibe.R
-import com.example.airvibe.core.designsystem.components.AuthFieldIcons
-import com.example.airvibe.core.designsystem.components.GlassTextField
-import com.example.airvibe.core.designsystem.components.LiquidGlassButton
-import com.example.airvibe.core.designsystem.components.LiquidGlassVariant
-import com.example.airvibe.core.designsystem.modifiers.glassBlur
-import com.example.airvibe.core.designsystem.modifiers.glassShadow
-import com.example.airvibe.core.designsystem.theme.AirVibeTheme
+import com.example.airvibe.core.designsystem.components.WaveHeader
 import com.example.airvibe.feature.auth.presentation.AuthMode
 import com.example.airvibe.feature.auth.presentation.AuthUiEvent
 import com.example.airvibe.feature.auth.presentation.AuthUiState
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.animation.slideInVertically
 
-/**
- * Pantalla de autenticación. Mantiene la estética glass del resto
- * de la app: un único card translúcido con dos campos (email +
- * password) y un toggle para cambiar entre "Iniciar sesión" y
- * "Crear cuenta".
- */
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+
 @Composable
 fun AuthScreenContent(
     state: AuthUiState,
     onEvent: (AuthUiEvent) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val tokens = AirVibeTheme.glass
+    var isVisible by remember { mutableStateOf(false) }
+    val scrollState = rememberScrollState()
+    
+    LaunchedEffect(Unit) {
+        isVisible = true
+    }
 
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        Color(0xFFF8FAFC),
-                        Color(0xFFEEF2FF),
-                    ),
-                ),
-            ),
+            .background(Color.White)
+            .navigationBarsPadding()
     ) {
-        Box(
+        androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
+            val width = size.width
+            val height = size.height
+            val patternPath = androidx.compose.ui.graphics.Path().apply {
+                var yOffset = height * 0.5f
+                while (yOffset < height * 1.5f) {
+                    moveTo(-width * 0.2f, yOffset)
+                    cubicTo(
+                        width * 0.3f, yOffset - height * 0.2f,
+                        width * 0.7f, yOffset + height * 0.3f,
+                        width * 1.2f, yOffset - height * 0.1f
+                    )
+                    yOffset += height * 0.12f
+                }
+                var xOffset = -width * 0.5f
+                while (xOffset < width * 1.5f) {
+                    moveTo(xOffset, height * 0.5f)
+                    cubicTo(
+                        xOffset + width * 0.3f, height * 0.7f,
+                        xOffset - width * 0.2f, height * 0.9f,
+                        xOffset + width * 0.4f, height * 1.2f
+                    )
+                    xOffset += width * 0.2f
+                }
+            }
+            drawPath(
+                path = patternPath,
+                color = Color.LightGray.copy(alpha = 0.4f),
+                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 4f)
+            )
+        }
+
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .statusBarsPadding()
-                .navigationBarsPadding()
-                .padding(horizontal = 20.dp),
-            contentAlignment = Alignment.Center,
+                .verticalScroll(scrollState)
         ) {
-            AuthCard(
-                state = state,
-                onEvent = onEvent,
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
-    }
-}
-
-@Composable
-private fun AuthCard(
-    state: AuthUiState,
-    onEvent: (AuthUiEvent) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val tokens = AirVibeTheme.glass
-    Column(
-        modifier = modifier
-            .glassShadow(
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.30f),
-                cornerRadius = 32.dp,
-            )
-            .glassBlur(radius = 28.dp, shape = RoundedCornerShape(32.dp))
-            .clip(RoundedCornerShape(32.dp))
-            .background(
+            WaveHeader(
+                waveHeight = 580.dp, // Extender la ola hacia más abajo
                 brush = Brush.verticalGradient(
-                    colors = listOf(
-                        tokens.surfaceFillStrong,
-                        MaterialTheme.colorScheme.surface,
-                    ),
-                ),
-            )
-            .border(
-                width = 1.dp,
-                color = tokens.outerBorder,
-                shape = RoundedCornerShape(32.dp),
-            )
-            .padding(22.dp),
-    ) {
-        AuthHeader()
-        Spacer(modifier = Modifier.height(22.dp))
+                    0.0f to Color(0xFF305CDE),  // Azul oscuro
+                    0.45f to Color(0xFF305CDE), // Sigue azul oscuro
+                    0.65f to Color(0xFFFF6868), // Rojo (Tomate) directamente
+                    0.85f to Color(0xFFFFA84D), // Naranja
+                    1.0f to Color(0xFFFFDE21)   // Amarillo
+                )
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .statusBarsPadding()
+                        .padding(start = 32.dp, end = 32.dp, top = 64.dp),
+                    verticalArrangement = Arrangement.Top
+                ) {
+                    Text(
+                        text = if (state.mode == AuthMode.SignUp) "Crear\nCuenta" else "Bienvenido\nde nuevo",
+                        style = MaterialTheme.typography.displayLarge.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = androidx.compose.ui.unit.TextUnit(58f, androidx.compose.ui.unit.TextUnitType.Sp),
+                            lineHeight = androidx.compose.ui.unit.TextUnit(62f, androidx.compose.ui.unit.TextUnitType.Sp)
+                        ),
+                        color = Color.White
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = if (state.mode == AuthMode.SignUp) "Únete al radar sin internet." else "Conéctate a tu radar local.",
+                        style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.SemiBold),
+                        color = Color.White.copy(alpha = 0.9f),
+                        modifier = Modifier.fillMaxWidth(0.9f)
+                    )
+                }
+            }
 
-        AuthModeToggle(
-            mode = state.mode,
-            onModeChange = { onEvent(AuthUiEvent.ModeChanged(it)) },
-        )
+            Column(modifier = Modifier.offset(y = (-55).dp)) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Conexión segura vía malla Bluetooth y Wi-Fi",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.outline,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(16.dp))
 
-        Spacer(modifier = Modifier.height(22.dp))
+                AnimatedVisibility(
+                    visible = isVisible,
+                    enter = slideInVertically(initialOffsetY = { it / 4 }) + androidx.compose.animation.fadeIn()
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 32.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        androidx.compose.animation.AnimatedVisibility(
+                            visible = state.mode == AuthMode.SignUp,
+                            enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
+                            exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut()
+                        ) {
+                            FluidTextField(
+                                value = state.displayName,
+                                onValueChange = { onEvent(AuthUiEvent.DisplayNameChanged(it)) },
+                                label = "Nombre completo",
+                                leadingIcon = { Icon(Icons.Rounded.Person, contentDescription = null, tint = MaterialTheme.colorScheme.outline) },
+                                imeAction = ImeAction.Next,
+                            )
+                        }
 
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            if (state.mode == AuthMode.SignUp) {
-                GlassTextField(
-                    value = state.displayName,
-                    onValueChange = { onEvent(AuthUiEvent.DisplayNameChanged(it)) },
-                    label = "Nombre",
-                    placeholder = "¿Cómo te mostramos en el radar?",
-                    leadingIcon = AuthFieldIcons.name,
+                FluidTextField(
+                    value = state.email,
+                    onValueChange = { onEvent(AuthUiEvent.EmailChanged(it)) },
+                    label = "Correo electrónico",
+                    leadingIcon = { Icon(Icons.Rounded.Mail, contentDescription = null, tint = MaterialTheme.colorScheme.outline) },
+                    keyboardType = KeyboardType.Email,
                     imeAction = ImeAction.Next,
                 )
-            }
 
-            GlassTextField(
-                value = state.email,
-                onValueChange = { onEvent(AuthUiEvent.EmailChanged(it)) },
-                label = "Email",
-                placeholder = "tu@correo.com",
-                leadingIcon = AuthFieldIcons.email,
-                keyboardType = KeyboardType.Email,
-                imeAction = ImeAction.Next,
-            )
+                var passwordVisible by remember { mutableStateOf(false) }
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    FluidTextField(
+                        value = state.password,
+                        onValueChange = { onEvent(AuthUiEvent.PasswordChanged(it)) },
+                        label = "Contraseña",
+                        leadingIcon = { Icon(Icons.Rounded.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.outline) },
+                        isPassword = true,
+                        passwordVisible = passwordVisible,
+                        onPasswordVisibilityToggle = { passwordVisible = !passwordVisible },
+                        imeAction = ImeAction.Done,
+                        onImeAction = { onEvent(AuthUiEvent.Submit) },
+                    )
+                    
+                    if (state.mode == AuthMode.SignIn) {
+                        TextButton(
+                            onClick = { /* TODO */ },
+                            modifier = Modifier.align(Alignment.End),
+                            contentPadding = PaddingValues(0.dp)
+                        ) {
+                            Text("¿Olvidaste tu contraseña?", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                }
 
-            GlassTextField(
-                value = state.password,
-                onValueChange = { onEvent(AuthUiEvent.PasswordChanged(it)) },
-                label = "Contraseña",
-                placeholder = "Mínimo 6 caracteres",
-                leadingIcon = AuthFieldIcons.password,
-                isPassword = true,
-                imeAction = ImeAction.Done,
-                onImeAction = { onEvent(AuthUiEvent.Submit) },
-            )
-        }
+                AnimatedVisibility(
+                    visible = state.errorMessage != null,
+                    enter = fadeIn(),
+                    exit = fadeOut(),
+                ) {
+                    Column {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        ErrorBanner(
+                            message = state.errorMessage.orEmpty(),
+                            onDismiss = { onEvent(AuthUiEvent.DismissError) },
+                        )
+                    }
+                }
 
-        AnimatedVisibility(
-            visible = state.errorMessage != null,
-            enter = fadeIn(),
-            exit = fadeOut(),
-        ) {
-            Spacer(modifier = Modifier.height(12.dp))
-            ErrorBanner(
-                message = state.errorMessage.orEmpty(),
-                onDismiss = { onEvent(AuthUiEvent.DismissError) },
-            )
-        }
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = { onEvent(AuthUiEvent.Submit) },
+                        enabled = state.canSubmit && !state.isSubmitting,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp),
+                        shape = CircleShape,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        )
+                    ) {
+                        if (state.isSubmitting) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.onPrimary,
+                            )
+                        } else {
+                            Text(
+                                text = if (state.mode == AuthMode.SignIn) "Iniciar sesión" else "Registrarse",
+                                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
+                            )
+                        }
+                    }
 
-        Spacer(modifier = Modifier.height(20.dp))
-
-        LiquidGlassButton(
-            text = when (state.mode) {
-                AuthMode.SignIn -> "Iniciar sesión"
-                AuthMode.SignUp -> "Crear cuenta"
-            },
-            onClick = { onEvent(AuthUiEvent.Submit) },
-            icon = when (state.mode) {
-                AuthMode.SignIn -> Icons.Rounded.Login
-                AuthMode.SignUp -> Icons.Rounded.PersonAddAlt
-            },
-            variant = LiquidGlassVariant.Primary,
-            enabled = state.canSubmit && !state.isSubmitting,
-            modifier = Modifier.fillMaxWidth(),
-        )
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        if (state.isSubmitting) {
-            Box(
-                modifier = Modifier.fillMaxWidth(),
-                contentAlignment = Alignment.Center,
-            ) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(22.dp),
-                    strokeWidth = 2.5.dp,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun AuthHeader() {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(
-            modifier = Modifier
-                .size(72.dp)
-                .glassBlur(radius = 20.dp, shape = CircleShape)
-                .clip(CircleShape)
-                .background(
-                    brush = Brush.radialGradient(
-                        colors = listOf(
-                            MaterialTheme.colorScheme.primary,
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
+                    OutlinedButton(
+                        onClick = {
+                            onEvent(
+                                AuthUiEvent.ModeChanged(
+                                    if (state.mode == AuthMode.SignIn) AuthMode.SignUp else AuthMode.SignIn
+                                )
+                            )
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp),
+                        shape = CircleShape,
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.onSurface
                         ),
-                    ),
-                )
-                .border(
-                    width = 1.dp,
-                    color = Color.White.copy(alpha = 0.30f),
-                    shape = CircleShape,
-                ),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = Icons.Rounded.Radar,
-                contentDescription = null,
-                tint = Color.White,
-                modifier = Modifier.size(32.dp),
-            )
+                        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                    ) {
+                        Text(
+                            text = if (state.mode == AuthMode.SignIn) "Regístrate" else "Iniciar sesión",
+                            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Medium)
+                        )
+                    }
+                }
+            }
+            }
+            }
         }
-        Spacer(modifier = Modifier.height(12.dp))
-        Text(
-            text = stringResource(R.string.app_name),
-            style = MaterialTheme.typography.headlineMedium.copy(
-                fontWeight = FontWeight.SemiBold,
-            ),
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-        Text(
-            text = "Tu red de contactos sin internet",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
 }
 
 @Composable
-private fun AuthModeToggle(
-    mode: AuthMode,
-    onModeChange: (AuthMode) -> Unit,
+private fun FluidTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    leadingIcon: @Composable () -> Unit,
+    keyboardType: KeyboardType = KeyboardType.Text,
+    imeAction: ImeAction = ImeAction.Default,
+    onImeAction: () -> Unit = {},
+    isPassword: Boolean = false,
+    passwordVisible: Boolean = false,
+    onPasswordVisibilityToggle: () -> Unit = {}
 ) {
-    val tokens = AirVibeTheme.glass
-    val shape = RoundedCornerShape(18.dp)
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(shape)
-            .background(tokens.surfaceFill)
-            .border(width = 1.dp, color = tokens.outerBorder, shape = shape)
-            .padding(4.dp),
-    ) {
-        ModeChip(
-            text = "Iniciar sesión",
-            selected = mode == AuthMode.SignIn,
-            onClick = { onModeChange(AuthMode.SignIn) },
-            modifier = Modifier.weight(1f),
-        )
-        ModeChip(
-            text = "Crear cuenta",
-            selected = mode == AuthMode.SignUp,
-            onClick = { onModeChange(AuthMode.SignUp) },
-            modifier = Modifier.weight(1f),
-        )
-    }
-}
-
-@Composable
-private fun ModeChip(
-    text: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val shape = RoundedCornerShape(14.dp)
-    val bg = if (selected) {
-        MaterialTheme.colorScheme.primary
-    } else {
-        Color.Transparent
-    }
-    val fg = if (selected) {
-        MaterialTheme.colorScheme.onPrimary
-    } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
-    }
-    Box(
-        modifier = modifier
-            .clip(shape)
-            .background(bg, shape)
-            .clickable(onClick = onClick)
-            .padding(vertical = 10.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelLarge.copy(
-                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-            ),
-            color = fg,
-        )
-    }
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        placeholder = { Text(label, color = MaterialTheme.colorScheme.outline) },
+        leadingIcon = leadingIcon,
+        trailingIcon = if (isPassword) {
+            {
+                IconButton(onClick = onPasswordVisibilityToggle) {
+                    Icon(painterResource(android.R.drawable.ic_menu_view), contentDescription = null, tint = MaterialTheme.colorScheme.outline)
+                }
+            }
+        } else null,
+        visualTransformation = if (isPassword && !passwordVisible) PasswordVisualTransformation() else VisualTransformation.None,
+        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+            keyboardType = keyboardType,
+            imeAction = imeAction
+        ),
+        keyboardActions = androidx.compose.foundation.text.KeyboardActions(
+            onAny = { onImeAction() }
+        ),
+        singleLine = true,
+        shape = RoundedCornerShape(24.dp),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+            focusedBorderColor = MaterialTheme.colorScheme.primary,
+            unfocusedBorderColor = Color.Transparent,
+            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+            cursorColor = MaterialTheme.colorScheme.primary
+        ),
+        modifier = Modifier.fillMaxWidth()
+    )
 }
 
 @Composable
@@ -334,54 +323,35 @@ private fun ErrorBanner(
     message: String,
     onDismiss: () -> Unit,
 ) {
-    val shape = RoundedCornerShape(14.dp)
+    val shape = RoundedCornerShape(12.dp)
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(shape)
-            .background(MaterialTheme.colorScheme.error.copy(alpha = 0.10f))
-            .border(
-                width = 1.dp,
-                color = MaterialTheme.colorScheme.error.copy(alpha = 0.4f),
-                shape = shape,
-            )
+            .background(MaterialTheme.colorScheme.errorContainer)
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            modifier = Modifier
-                .size(28.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.error.copy(alpha = 0.15f)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = Icons.Rounded.Bolt,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.error,
-                modifier = Modifier.size(14.dp),
-            )
-        }
+        Icon(
+            imageVector = Icons.Rounded.Bolt,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onErrorContainer,
+            modifier = Modifier.size(16.dp),
+        )
         Spacer(modifier = Modifier.width(10.dp))
         Text(
             text = message,
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.error,
+            color = MaterialTheme.colorScheme.onErrorContainer,
             modifier = Modifier.weight(1f),
         )
-        Box(
+        Icon(
+            imageVector = Icons.Rounded.Close,
+            contentDescription = "Cerrar",
+            tint = MaterialTheme.colorScheme.onErrorContainer,
             modifier = Modifier
-                .size(24.dp)
-                .clip(CircleShape)
+                .size(16.dp)
                 .clickable(onClick = onDismiss),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = Icons.Rounded.Close,
-                contentDescription = "Cerrar",
-                tint = MaterialTheme.colorScheme.error,
-                modifier = Modifier.size(14.dp),
-            )
-        }
+        )
     }
 }

@@ -6,6 +6,7 @@ import com.example.airvibe.feature.auth.data.repository.SupabaseAuthRepository
 import com.example.airvibe.feature.auth.domain.repository.AuthRepository
 import com.example.airvibe.feature.chat.data.device.nearby.NearbyChatMessageGateway
 import com.example.airvibe.feature.chat.data.local.dao.ProximityRoomDao
+import com.example.airvibe.feature.chat.data.remote.SupabaseChatMessageDataSource
 import com.example.airvibe.feature.chat.data.remote.SupabaseProximityRoomDataSource
 import com.example.airvibe.feature.chat.data.remote.SupabaseRoomMessageDataSource
 import com.example.airvibe.feature.chat.data.repository.ProximityRoomRepositoryImpl
@@ -128,13 +129,19 @@ object ServiceLocator {
         SupabaseRoomMessageDataSource(supabase = supabaseClient)
     }
 
+    val chatMessageRemoteDataSource: SupabaseChatMessageDataSource by lazy {
+        SupabaseChatMessageDataSource(supabase = supabaseClient)
+    }
+
     val cloudSyncService: CloudSyncService by lazy {
         CloudSyncService(
             savedContactDao = savedContactDao,
             roomDao = proximityRoomDao,
+            chatDao = chatDao,
             savedContactRemote = savedContactRemoteDataSource,
             roomRemote = proximityRoomRemoteDataSource,
             roomMessageRemote = roomMessageRemoteDataSource,
+            chatMessageRemote = chatMessageRemoteDataSource,
         )
     }
 

@@ -22,47 +22,56 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 );
 
 -- =============================================================
--- 2) RADAR_NODES  (Bluetooth-discovered / saved contacts)
---    user_id -> the authenticated user who saved the contact
---    peer_id -> the discovered user (FK to auth.users)
+-- 2) RADAR_NODES  (offline-first P2P radar with cloud backup)
+--    owner_id     -> authenticated user who owns this backup copy
+--    id           -> Bluetooth device-<UUID> of the peer (TEXT)
+--    display_name -> human readable name
+--    Other columns mirror NodeEntity (angle, distance, signal, etc.)
 -- =============================================================
 CREATE TABLE IF NOT EXISTS public.radar_nodes (
-    id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id     UUID        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-    peer_id     UUID        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-    name        TEXT        NOT NULL,
-    status      TEXT,
-    tags        TEXT[]      NOT NULL DEFAULT '{}',
-    is_favorite BOOLEAN     NOT NULL DEFAULT FALSE,
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT radar_nodes_user_peer_unique UNIQUE (user_id, peer_id)
+    id                  TEXT         PRIMARY KEY,
+    owner_id            UUID         NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    display_name        TEXT         NOT NULL,
+    status              TEXT,
+    detail              TEXT         NOT NULL DEFAULT '',
+    kind                TEXT         NOT NULL DEFAULT 'Person',
+    presence            TEXT         NOT NULL DEFAULT 'Online',
+    angle_degrees       DOUBLE PRECISION NOT NULL DEFAULT 0,
+    distance_normalized DOUBLE PRECISION NOT NULL DEFAULT 0,
+    signal_strength     DOUBLE PRECISION NOT NULL DEFAULT 0,
+    accent_color_argb   BIGINT       NOT NULL DEFAULT 0,
+    tags                TEXT[]       NOT NULL DEFAULT '{}',
+    is_favorite         BOOLEAN      NOT NULL DEFAULT FALSE,
+    created_at          TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at          TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_radar_nodes_user_id   ON public.radar_nodes(user_id);
-CREATE INDEX IF NOT EXISTS idx_radar_nodes_user_peer ON public.radar_nodes(user_id, peer_id);
+CREATE INDEX IF NOT EXISTS idx_radar_nodes_owner ON public.radar_nodes(owner_id);
 
 -- =============================================================
--- 3) CHAT_MESSAGES  (offline-first message history)
---    sent_at   -> original timestamp from the client device
---    created_at -> server-side receive time (used for sync order)
+-- 3) CHAT_MESSAGES  (offline-first 1-a-1 message history)
+--    owner_id     -> authenticated user who owns this backup copy
+--    peer_node_id -> Bluetooth device-<UUID> of the other participant
+--    direction    -> 'Outgoing' (yo) | 'Incoming' (peer)
+--    created_at   -> original timestamp from the client device
 -- =============================================================
 CREATE TABLE IF NOT EXISTS public.chat_messages (
-    id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-    sender_id   UUID        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-    receiver_id UUID        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-    content     TEXT        NOT NULL,
-    is_synced   BOOLEAN     NOT NULL DEFAULT TRUE,
-    sent_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT chat_messages_participants_distinct CHECK (sender_id <> receiver_id)
+    id           TEXT         PRIMARY KEY,
+    owner_id     UUID         NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    peer_node_id TEXT         NOT NULL,
+    direction    TEXT         NOT NULL,
+    content      TEXT         NOT NULL,
+    kind         TEXT         NOT NULL DEFAULT 'Text',
+    status       TEXT         NOT NULL DEFAULT 'Sent',
+    is_synced    BOOLEAN      NOT NULL DEFAULT TRUE,
+    created_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_chat_messages_conversation
-    ON public.chat_messages(sender_id, receiver_id, sent_at DESC);
-CREATE INDEX IF NOT EXISTS idx_chat_messages_inbox
-    ON public.chat_messages(receiver_id, sent_at DESC);
+CREATE INDEX IF NOT EXISTS idx_chat_messages_owner ON public.chat_messages(owner_id);
+CREATE INDEX IF NOT EXISTS idx_chat_messages_peer  ON public.chat_messages(peer_node_id);
+CREATE INDEX IF NOT EXISTS idx_chat_messages_unsynced
+    ON public.chat_messages(owner_id, peer_node_id) WHERE is_synced = FALSE;
 
 -- =============================================================
 -- 4) SAVED_CONTACTS  (persistent friends list, offline-first)
@@ -116,6 +125,7 @@ CREATE TABLE IF NOT EXISTS public.room_messages (
     sender_node_id  TEXT        NOT NULL,
     sender_name     TEXT        NOT NULL,
     content         TEXT        NOT NULL,
+    is_own          BOOLEAN     NOT NULL DEFAULT FALSE,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -205,46 +215,58 @@ CREATE POLICY "profiles_delete_own"
     TO authenticated
     USING (id = auth.uid());
 
--- ---------- radar_nodes: scoped to owner (user_id) ----------
-DROP POLICY IF EXISTS "radar_nodes_select_own" ON public.radar_nodes;
-DROP POLICY IF EXISTS "radar_nodes_insert_own" ON public.radar_nodes;
-DROP POLICY IF EXISTS "radar_nodes_update_own" ON public.radar_nodes;
-DROP POLICY IF EXISTS "radar_nodes_delete_own" ON public.radar_nodes;
+-- ---------- radar_nodes: scoped to owner (owner_id) ----------
+DROP POLICY IF EXISTS "radar_nodes_select_own"      ON public.radar_nodes;
+DROP POLICY IF EXISTS "radar_nodes_insert_own"      ON public.radar_nodes;
+DROP POLICY IF EXISTS "radar_nodes_update_own"      ON public.radar_nodes;
+DROP POLICY IF EXISTS "radar_nodes_delete_own"      ON public.radar_nodes;
+DROP POLICY IF EXISTS "radar_nodes_select_participant" ON public.radar_nodes;
+DROP POLICY IF EXISTS "radar_nodes_insert_participant" ON public.radar_nodes;
 
 CREATE POLICY "radar_nodes_select_own"
     ON public.radar_nodes FOR SELECT
     TO authenticated
-    USING (user_id = auth.uid());
+    USING (owner_id = auth.uid());
 
 CREATE POLICY "radar_nodes_insert_own"
     ON public.radar_nodes FOR INSERT
     TO authenticated
-    WITH CHECK (user_id = auth.uid());
+    WITH CHECK (owner_id = auth.uid());
 
 CREATE POLICY "radar_nodes_update_own"
     ON public.radar_nodes FOR UPDATE
     TO authenticated
-    USING (user_id = auth.uid())
-    WITH CHECK (user_id = auth.uid());
+    USING (owner_id = auth.uid())
+    WITH CHECK (owner_id = auth.uid());
 
 CREATE POLICY "radar_nodes_delete_own"
     ON public.radar_nodes FOR DELETE
     TO authenticated
-    USING (user_id = auth.uid());
+    USING (owner_id = auth.uid());
 
--- ---------- chat_messages: participants can read; only sender can insert ----------
+-- ---------- chat_messages: owner only (offline-first backup) ----------
 DROP POLICY IF EXISTS "chat_messages_select_participant" ON public.chat_messages;
 DROP POLICY IF EXISTS "chat_messages_insert_sender"     ON public.chat_messages;
+DROP POLICY IF EXISTS "chat_messages_select_own"        ON public.chat_messages;
+DROP POLICY IF EXISTS "chat_messages_insert_own"        ON public.chat_messages;
+DROP POLICY IF EXISTS "chat_messages_update_own"        ON public.chat_messages;
+DROP POLICY IF EXISTS "chat_messages_delete_own"        ON public.chat_messages;
 
-CREATE POLICY "chat_messages_select_participant"
-    ON public.chat_messages FOR SELECT
-    TO authenticated
-    USING (sender_id = auth.uid() OR receiver_id = auth.uid());
+CREATE POLICY "chat_messages_select_own"
+    ON public.chat_messages FOR SELECT TO authenticated
+    USING (owner_id = auth.uid());
 
-CREATE POLICY "chat_messages_insert_sender"
-    ON public.chat_messages FOR INSERT
-    TO authenticated
-    WITH CHECK (sender_id = auth.uid());
+CREATE POLICY "chat_messages_insert_own"
+    ON public.chat_messages FOR INSERT TO authenticated
+    WITH CHECK (owner_id = auth.uid());
+
+CREATE POLICY "chat_messages_update_own"
+    ON public.chat_messages FOR UPDATE TO authenticated
+    USING (owner_id = auth.uid()) WITH CHECK (owner_id = auth.uid());
+
+CREATE POLICY "chat_messages_delete_own"
+    ON public.chat_messages FOR DELETE TO authenticated
+    USING (owner_id = auth.uid());
 
 -- ---------- saved_contacts: owner only ----------
 DROP POLICY IF EXISTS "saved_contacts_select_own" ON public.saved_contacts;

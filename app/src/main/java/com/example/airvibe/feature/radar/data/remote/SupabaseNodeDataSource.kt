@@ -24,9 +24,9 @@ class SupabaseNodeDataSource(
 
     private val table = RADAR_NODES_TABLE
 
-    override suspend fun upsert(nodes: List<RemoteNode>): Result<List<String>> = runCatching {
+    override suspend fun upsert(nodes: List<RemoteNode>, ownerId: String): Result<List<String>> = runCatching {
         if (nodes.isEmpty()) return@runCatching emptyList()
-        val dtos = nodes.map { it.toDto() }
+        val dtos = nodes.map { it.toDto(ownerId) }
         supabase.postgrest.from(table).upsert(dtos) {
             onConflict = "id"
         }
@@ -38,10 +38,12 @@ class SupabaseNodeDataSource(
         )
     }
 
-    override suspend fun fetchAll(): Result<List<RemoteNode>> = runCatching {
+    override suspend fun fetchAll(ownerId: String): Result<List<RemoteNode>> = runCatching {
         supabase.postgrest
             .from(table)
-            .select(columns = Columns.ALL)
+            .select(columns = Columns.ALL) {
+                filter { eq("owner_id", ownerId) }
+            }
             .decodeList<RemoteNodeDto>()
             .map { it.toDomain() }
     }.recoverCatching { throwable ->
@@ -51,9 +53,12 @@ class SupabaseNodeDataSource(
         )
     }
 
-    override suspend fun delete(nodeId: String): Result<Unit> = runCatching {
+    override suspend fun delete(nodeId: String, ownerId: String): Result<Unit> = runCatching {
         supabase.postgrest.from(table).delete {
-            filter { eq("id", nodeId) }
+            filter {
+                eq("id", nodeId)
+                eq("owner_id", ownerId)
+            }
         }
         Unit
     }.recoverCatching { throwable ->
@@ -63,8 +68,9 @@ class SupabaseNodeDataSource(
         )
     }
 
-    private fun RemoteNode.toDto(): RemoteNodeDto = RemoteNodeDto(
+    private fun RemoteNode.toDto(ownerId: String): RemoteNodeDto = RemoteNodeDto(
         id = id,
+        ownerId = ownerId,
         displayName = displayName,
         status = status,
         detail = detail,
@@ -83,10 +89,11 @@ class SupabaseNodeDataSource(
      * para los tests o futuras implementaciones de "pull-to-refresh".
      */
     @Suppress("unused")
-    suspend fun fetchAllOrdered(): Result<List<RemoteNode>> = runCatching {
+    suspend fun fetchAllOrdered(ownerId: String): Result<List<RemoteNode>> = runCatching {
         supabase.postgrest
             .from(table)
             .select(columns = Columns.ALL) {
+                filter { eq("owner_id", ownerId) }
                 order(column = "updated_at", order = Order.DESCENDING)
             }
             .decodeList<RemoteNodeDto>()

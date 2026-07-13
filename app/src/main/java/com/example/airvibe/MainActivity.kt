@@ -26,6 +26,8 @@ import com.example.airvibe.feature.chat.presentation.RoomsListScreen
 import com.example.airvibe.feature.radar.presentation.FriendsScreen
 import com.example.airvibe.feature.radar.presentation.RadarScreen
 import com.example.airvibe.core.di.ServiceLocator
+import com.example.airvibe.feature.auth.presentation.components.SplashScreen
+import com.example.airvibe.feature.auth.presentation.components.OnboardingScreen
 
 class MainActivity : ComponentActivity() {
 
@@ -80,9 +82,9 @@ private fun AirVibeApp(
     val darkTheme = remember { false }
     var chatTarget by rememberSaveable(stateSaver = ChatTarget.Saver) {
         mutableStateOf(
-            when (val link = initialDeepLink) {
-                is AppDeepLink.Room -> ChatTarget.ActiveRoom(link.roomId)
-                is AppDeepLink.Chat -> ChatTarget.ActiveChat(link.nodeId)
+            when (initialDeepLink) {
+                is AppDeepLink.Room -> ChatTarget.ActiveRoom(initialDeepLink.roomId)
+                is AppDeepLink.Chat -> ChatTarget.ActiveChat(initialDeepLink.nodeId)
                 null -> ChatTarget.Closed
             },
         )
@@ -90,16 +92,17 @@ private fun AirVibeApp(
     var fromMatchNavigation by rememberSaveable {
         mutableStateOf((initialDeepLink as? AppDeepLink.Chat)?.fromMatch == true)
     }
+    var hasSeenOnboarding by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(initialDeepLink) {
-        when (val link = initialDeepLink) {
+        when (initialDeepLink) {
             is AppDeepLink.Room -> {
-                chatTarget = ChatTarget.ActiveRoom(link.roomId)
+                chatTarget = ChatTarget.ActiveRoom(initialDeepLink.roomId)
                 onDeepLinkHandled()
             }
             is AppDeepLink.Chat -> {
-                chatTarget = ChatTarget.ActiveChat(link.nodeId)
-                fromMatchNavigation = link.fromMatch
+                chatTarget = ChatTarget.ActiveChat(initialDeepLink.nodeId)
+                fromMatchNavigation = initialDeepLink.fromMatch
                 onDeepLinkHandled()
             }
             null -> Unit
@@ -109,15 +112,33 @@ private fun AirVibeApp(
     AirVibeTheme(darkTheme = darkTheme) {
         Surface(modifier = Modifier.fillMaxSize()) {
             when (authStatus) {
-                AuthStatus.Loading -> SplashPlaceholder()
-                AuthStatus.SignedOut -> AuthScreen()
+                AuthStatus.Loading -> SplashScreen()
+                AuthStatus.SignedOut -> {
+                    if (hasSeenOnboarding) {
+                        AuthScreen()
+                    } else {
+                        OnboardingScreen(
+                            onSkip = { hasSeenOnboarding = true },
+                            onNext = { hasSeenOnboarding = true }
+                        )
+                    }
+                }
                 AuthStatus.SignedIn -> when (val target = chatTarget) {
-                    ChatTarget.Closed -> RadarScreen(
-                        onOpenChats = { chatTarget = ChatTarget.List },
-                        onOpenChat = { nodeId -> chatTarget = ChatTarget.ActiveChat(nodeId) },
-                        onOpenFriends = { chatTarget = ChatTarget.Friends },
-                        onOpenRooms = { chatTarget = ChatTarget.RoomsList },
-                        onOpenRoom = { roomId -> chatTarget = ChatTarget.ActiveRoom(roomId) },
+                    ChatTarget.Closed -> com.example.airvibe.feature.main.presentation.MainScreen(
+                        radarContent = {
+                            com.example.airvibe.feature.radar.presentation.RadarChatsScreen(
+                                onOpenChat = { nodeId -> chatTarget = ChatTarget.ActiveChat(nodeId) }
+                            )
+                        },
+                        servicesContent = {
+                            com.example.airvibe.feature.services.presentation.ServicesScreen()
+                        },
+                        groupsContent = {
+                            com.example.airvibe.feature.groups.presentation.GroupsScreen()
+                        },
+                        profileContent = {
+                            com.example.airvibe.feature.profile.presentation.ProfileScreen()
+                        }
                     )
                     ChatTarget.List -> ConversationsListScreen(
                         onBack = { chatTarget = ChatTarget.Closed },
@@ -187,7 +208,4 @@ sealed interface ChatTarget {
     }
 }
 
-@Composable
-private fun SplashPlaceholder() {
-    Surface(modifier = Modifier.fillMaxSize()) { }
-}
+

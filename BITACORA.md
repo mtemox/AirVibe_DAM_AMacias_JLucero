@@ -1,8 +1,8 @@
 # Bitácora de cambios — AirVibe
 
-**Fecha:** 11 de julio de 2026  
-**Contexto:** Sesión de desarrollo sobre la feature de salas cercanas, amigos persistentes, sync con Supabase y correcciones de chat P2P.  
-**Estado al cierre:** `assembleDebug` compila correctamente. Quedan bugs abiertos en el renderizado de mensajes de sala (ver sección 8).
+**Fecha:** 11 de julio de 2026 (sesión original) — 12 de julio de 2026 (cierre de bugs 8.1, 8.2 y 8.4)
+**Contexto:** Sesión de desarrollo sobre la feature de salas cercanas, amigos persistentes, sync con Supabase y correcciones de chat P2P.
+**Estado al cierre:** `assembleDebug` compila correctamente. **Bugs 8.1, 8.2 y 8.4 resueltos.** Bug 8.3 es solo una nota de entorno (no afecta a la app). Ver sección 8 para el detalle técnico.
 
 ---
 
@@ -318,33 +318,41 @@ En `resolveRoomEndpoints`, el mapa `endpointToNode` es `endpointId → nodeId`. 
 
 ## 8. Bugs conocidos / trabajo pendiente
 
-### 8.1 Renderizado de mensajes en sala (ABIERTO al cierre)
+### 8.1 Renderizado de mensajes en sala — ✅ [RESUELTO]
 
-**Síntoma reportado por el usuario:**
+**Síntoma original reportado por el usuario:**
 - Mensajes enviados de forma alternada aparecen agrupados por remitente (dos "bloques" en lugar de intercalados)
 - Tras reinstalar, todos los mensajes pueden verse a la izquierda sin distinguir cuáles son propios
-- El fix de `is_own` + `reverseLayout` **no resolvió completamente** el problema según última prueba
 
-**Hipótesis para investigar:**
-1. Orden en DB: verificar `ORDER BY created_at ASC, id ASC` en `ProximityRoomDao.observeMessages`
-2. `reverseLayout` + `asReversed()`: confirmar que la lista final es cronológica ascendente visualmente
-3. Restore desde Supabase: mensajes antiguos sin `is_own` en remoto → todos `false`
-4. Posible colisión de timestamps iguales entre dispositivos
-5. Verificar que `insertOutgoingMessage` y `persistIncomingMessage` usan `createdAt` del payload remoto en mensajes recibidos
+**Solución aplicada (dos síntomas, una causa por uno):**
 
-**Archivos clave:** `GroupRoomScreen.kt`, `RoomMapper.kt`, `ProximityRoomDao.kt`, `RemoteRoomMessageDto.kt`
+- **Síntoma A — Bloques por desfase de reloj P2P:** en `NearbyChatMessageGateway.kt` se normaliza el `createdAt` del mensaje entrante contra `System.currentTimeMillis()` del receptor. Si el desfase supera los 5 s (umbral `MAX_CLOCK_SKEW_MS`), se usa el reloj local del receptor; si no, se respeta el del emisor. Esto evita que los relojes desincronizados de dos celulares offline agrupen los mensajes por remitente en la query `ORDER BY created_at ASC` del DAO.
+- **Síntoma B — Mensajes propios a la izquierda tras reinstalar:** la columna `is_own` ya existía en el modelo Kotlin, pero faltaba en el esquema remoto de Supabase. Se aplicó el `ALTER TABLE public.room_messages ADD COLUMN IF NOT EXISTS is_own BOOLEAN NOT NULL DEFAULT FALSE` y se actualizó `supabase_schema.sql` para que cualquier setup fresco desde cero ya la incluya.
 
-### 8.2 Chat 1-a-1 sin backup cloud
+**Archivos tocados:** `NearbyChatMessageGateway.kt` (constante + normalización en `onIncomingPayload`), `supabase_schema.sql` (defensivo). **No se modificó:** `RoomMapper`, `ProximityRoomDao`, `GroupRoomScreen` ni la arquitectura.
 
-El chat personal sigue solo local + P2P. La tabla `chat_messages` de Supabase usa UUID auth (`sender_id`/`receiver_id`), incompatible con IDs Bluetooth (`device-uuid`). No se implementó sync cloud para 1-a-1.
+### 8.2 Chat 1-a-1 sin backup cloud — ✅ [RESUELTO]
+
+**Síntoma original:** el chat personal seguía solo local + P2P. La tabla `chat_messages` remota estaba modelada con `sender_id`/`receiver_id` como UUID FK a `auth.users`, incompatible con los IDs Bluetooth `device-<UUID>` que usa la app.
+
+**Solución aplicada:** se migró la tabla remota al patrón offline-first usado por `room_messages` y `saved_contacts`: PK `id TEXT` (UUID generado en cliente), `owner_id UUID FK auth.users` (de quién es la copia de respaldo), `peer_node_id TEXT` (Bluetooth del peer), `direction TEXT` (Outgoing/Incoming), más `kind` y `status`. La RLS pasó a `owner_id = auth.uid()` con 4 policies (select/insert/update/delete). El script de migración es idempotente (DROP FKs primero, luego ALTER/DROP/ADD columnas) y preserva filas legacy en estado oculto por RLS.
+
+**Archivos nuevos (2):** `feature/chat/data/remote/RemoteChatMessageDto.kt`, `feature/chat/data/remote/SupabaseChatMessageDataSource.kt`.
+**Archivos modificados (2):** `feature/radar/data/sync/CloudSyncService.kt` (inyección + `restoreChatMessages`/`pushChatMessages`), `core/di/ServiceLocator.kt` (wiring del data source). **No se modificó:** `ChatMessageEntity`, `ChatDao`, `ChatRepositoryImpl`, dominio, ViewModels ni UI.
 
 ### 8.3 Plugin Supabase en Cursor
 
 MCP conectado a `wmtoxbjvgvokdmsjenbq`, no al proyecto de producción `sgdvortojvmfbfauginq`. Migraciones deben ejecutarse manualmente o re-autenticar el plugin.
 
-### 8.4 Radar nodes vs schema Supabase
+> ℹ️ **Nota:** esta entrada es solo una nota de entorno de desarrollo (configuración del plugin de Cursor en el editor del compañero). No es un bug de la aplicación ni requiere cambios de código. Se conserva aquí para referencia del equipo.
 
-El schema SQL de `radar_nodes` en `supabase_schema.sql` (UUID `user_id`/`peer_id`) puede no coincidir con `RemoteNodeDto` de la app (text `id`, campos de ángulo/distancia). El sync de nodos radar existía antes; validar compatibilidad si falla sync de nodos.
+### 8.4 Radar nodes vs schema Supabase — ✅ [RESUELTO]
+
+**Síntoma original:** la tabla remota `radar_nodes` estaba modelada con un paradigma de "red social" (PK UUID + `user_id`/`peer_id` FK a `auth.users` + `UNIQUE(user_id, peer_id)`), incompatible con el modelo P2P/Bluetooth de la app (id `device-<UUID>` TEXT) y con la cantidad de columnas específicas del radar que la app envía (angle, distance, signal, accent_color, presence, etc.). El sync de nodos fallaba silenciosamente en cada ejecución del `SyncWorker`.
+
+**Solución aplicada:** se migró la tabla al patrón offline-first consistente con el resto: PK `id TEXT`, `owner_id UUID FK auth.users`, `display_name TEXT` (renombrado desde `name`), más todas las columnas específicas que envía `RemoteNodeDto` (`detail`, `kind`, `presence`, `angle_degrees`, `distance_normalized`, `signal_strength`, `accent_color_argb`). Se eliminaron `user_id`, `peer_id` y el `UNIQUE` constraint. La RLS pasó a `owner_id = auth.uid()` con 4 policies. El script de migración v2 dropea las FKs a `auth.users` antes de cualquier `ALTER COLUMN`/`DROP COLUMN` para evitar el error de tipo.
+
+**Archivos modificados (4):** `feature/radar/data/remote/RemoteNodeDto.kt` (campo `ownerId` + `toEntity()`), `feature/radar/domain/remote/RemoteNodeDataSource.kt` (3 firmas: `upsert(nodes, ownerId)`, `fetchAll(ownerId)`, `delete(nodeId, ownerId)`), `feature/radar/data/remote/SupabaseNodeDataSource.kt` (filtro `eq("owner_id", ownerId)` en queries), `feature/radar/data/sync/SyncWorker.kt` (1 línea: pasar `userId` al `upsert`). **No se modificó:** `RemoteNode` (modelo de dominio), `NodeEntity`, `NodeMapper`, `RadarDao`, `RadarRepositoryImpl`, `ServiceLocator`, ViewModels ni UI — Clean Architecture intacta al 100 %.
 
 ---
 

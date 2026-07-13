@@ -48,7 +48,7 @@ class SyncWorker(
         val pendingNodes = radarDao.observePendingSync().first()
         if (pendingNodes.isNotEmpty()) {
             val remoteNodes = pendingNodes.map { it.toRemoteNode() }
-            val nodeOutcome = remote.upsert(remoteNodes)
+            val nodeOutcome = remote.upsert(remoteNodes, userId)
             val syncedIds = nodeOutcome.getOrNull()
             if (syncedIds != null) {
                 radarDao.markAsSynced(syncedIds)

@@ -213,12 +213,16 @@ class NearbyChatMessageGateway(
                     val senderName = decoded.senderDisplayName?.takeIf { it.isNotBlank() }
                         ?: radarRepository.getProfile(senderNodeId)?.displayName
                         ?: "Usuario cercano"
+                    val now = System.currentTimeMillis()
+                    val remoteTime = decoded.createdAtMillis
+                    val normalizedTime =
+                        if (kotlin.math.abs(remoteTime - now) > MAX_CLOCK_SKEW_MS) now else remoteTime
                     roomRepository.persistIncomingMessage(
                         roomId = roomId,
                         senderNodeId = senderNodeId,
                         senderName = senderName,
                         text = decoded.text,
-                        createdAt = decoded.createdAtMillis,
+                        createdAt = normalizedTime,
                         messageId = decoded.messageId,
                     )
                 }
@@ -280,5 +284,6 @@ class NearbyChatMessageGateway(
 
     companion object {
         private const val TAG = "NearbyChatGateway"
+        private const val MAX_CLOCK_SKEW_MS = 5_000L
     }
 }

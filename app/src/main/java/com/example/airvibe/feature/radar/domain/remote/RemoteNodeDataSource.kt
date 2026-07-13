@@ -36,15 +36,17 @@ data class RemoteNode(
 interface RemoteNodeDataSource {
 
     /**
-     * Sube un lote de nodos al backend. Devuelve los IDs que
-     * se persistieron correctamente para que el `SyncWorker`
+     * Sube un lote de nodos al backend. [ownerId] identifica al
+     * usuario autenticado que es dueño de la copia de respaldo;
+     * el backend lo usa para sus policies RLS. Devuelve los IDs
+     * que se persistieron correctamente para que el `SyncWorker`
      * los marque como sincronizados localmente.
      */
-    suspend fun upsert(nodes: List<RemoteNode>): Result<List<String>>
+    suspend fun upsert(nodes: List<RemoteNode>, ownerId: String): Result<List<String>>
 
-    /** Descarga todos los nodos del usuario autenticado. */
-    suspend fun fetchAll(): Result<List<RemoteNode>>
+    /** Descarga los nodos del usuario [ownerId] autenticado. */
+    suspend fun fetchAll(ownerId: String): Result<List<RemoteNode>>
 
-    /** Elimina un nodo en la nube. */
-    suspend fun delete(nodeId: String): Result<Unit>
+    /** Elimina un nodo en la nube, restringido al dueño [ownerId]. */
+    suspend fun delete(nodeId: String, ownerId: String): Result<Unit>
 }

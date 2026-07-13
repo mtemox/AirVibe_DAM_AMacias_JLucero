@@ -1,5 +1,7 @@
 package com.example.airvibe.feature.radar.data.sync
 
+import com.example.airvibe.feature.chat.data.local.dao.ChatDao
+import com.example.airvibe.feature.chat.data.remote.SupabaseChatMessageDataSource
 import com.example.airvibe.feature.chat.data.remote.SupabaseProximityRoomDataSource
 import com.example.airvibe.feature.chat.data.remote.SupabaseRoomMessageDataSource
 import com.example.airvibe.feature.chat.data.remote.toEntity
@@ -15,15 +17,18 @@ import com.example.airvibe.feature.radar.data.remote.toRemoteDto
  * - Amigos guardados ([saved_contacts])
  * - Salas cercanas ([proximity_rooms])
  * - Mensajes de sala ([room_messages])
+ * - Mensajes 1-a-1 ([chat_messages])
  *
  * Cada usuario respalda su propia copia en la nube (owner_id = auth.uid()).
  */
 class CloudSyncService(
     private val savedContactDao: SavedContactDao,
     private val roomDao: ProximityRoomDao,
+    private val chatDao: ChatDao,
     private val savedContactRemote: SupabaseSavedContactDataSource,
     private val roomRemote: SupabaseProximityRoomDataSource,
     private val roomMessageRemote: SupabaseRoomMessageDataSource,
+    private val chatMessageRemote: SupabaseChatMessageDataSource,
 ) {
 
     /** Descarga datos de la nube e inserta lo que falta localmente. */
@@ -31,6 +36,7 @@ class CloudSyncService(
         restoreContacts(ownerId)
         restoreRooms(ownerId)
         restoreRoomMessages(ownerId)
+        restoreChatMessages(ownerId)
     }
 
     /** Sube registros locales con is_synced = 0. */
@@ -38,6 +44,7 @@ class CloudSyncService(
         pushContacts(ownerId)
         pushRooms(ownerId)
         pushRoomMessages(ownerId)
+        pushChatMessages(ownerId)
     }
 
     private suspend fun restoreContacts(ownerId: String) {
@@ -91,5 +98,22 @@ class CloudSyncService(
         val dtos = pending.map { it.toRemoteDto(ownerId) }
         val synced = roomMessageRemote.upsert(dtos).getOrNull() ?: return
         roomDao.markMessagesSynced(synced)
+    }
+
+    private suspend fun restoreChatMessages(ownerId: String) {
+        val remote = chatMessageRemote.fetchAll(ownerId).getOrNull() ?: return
+        remote.forEach { dto ->
+            if (chatDao.getById(dto.id) == null) {
+                chatDao.upsertAll(listOf(dto.toEntity()))
+            }
+        }
+    }
+
+    private suspend fun pushChatMessages(ownerId: String) {
+        val pending = chatDao.getUnsynced()
+        if (pending.isEmpty()) return
+        val dtos = pending.map { it.toRemoteDto(ownerId) }
+        val synced = chatMessageRemote.upsert(dtos).getOrNull() ?: return
+        chatDao.markAsSynced(synced)
     }
 }

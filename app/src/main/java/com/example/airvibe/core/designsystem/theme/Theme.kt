@@ -8,6 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.graphics.Color
 import androidx.core.view.WindowCompat
 
 /**
@@ -47,63 +48,63 @@ fun AirVibeTheme(
 }
 
 internal val AirVibeLightColors = lightColorScheme(
-    primary = BrandPalette.Indigo600,
-    onPrimary = NeutralPalette.Slate0,
-    primaryContainer = BrandPalette.Indigo100,
-    onPrimaryContainer = BrandPalette.Indigo800,
+    primary = Color(0xFF1f4bdb),
+    onPrimary = Color(0xFFffffff),
+    primaryContainer = Color(0xFF4166f5),
+    onPrimaryContainer = Color(0xFFfcf9ff),
 
-    secondary = BrandPalette.Cyan500,
-    onSecondary = NeutralPalette.Slate0,
-    secondaryContainer = BrandPalette.Cyan300,
-    onSecondaryContainer = NeutralPalette.Slate900,
+    secondary = Color(0xFF8c5000),
+    onSecondary = Color(0xFFffffff),
+    secondaryContainer = Color(0xFFffa84e),
+    onSecondaryContainer = Color(0xFF703f00),
 
-    tertiary = BrandPalette.Emerald500,
-    onTertiary = NeutralPalette.Slate0,
-    tertiaryContainer = BrandPalette.Emerald400,
-    onTertiaryContainer = NeutralPalette.Slate900,
+    tertiary = Color(0xFF06637d),
+    onTertiary = Color(0xFFffffff),
+    tertiaryContainer = Color(0xFF317c96),
+    onTertiaryContainer = Color(0xFFf6fbff),
 
-    background = NeutralPalette.Slate50,
-    onBackground = NeutralPalette.Slate900,
+    background = Color(0xFFffffff), // As requested in login_white_theme
+    onBackground = Color(0xFF1a1c1c),
 
-    surface = NeutralPalette.Slate0,
-    onSurface = NeutralPalette.Slate900,
-    surfaceVariant = NeutralPalette.Slate100,
-    onSurfaceVariant = NeutralPalette.Slate500,
-    surfaceTint = BrandPalette.Indigo500,
+    surface = Color(0xFFf9f9f9),
+    onSurface = Color(0xFF1a1c1c),
+    surfaceVariant = Color(0xFFe2e2e2),
+    onSurfaceVariant = Color(0xFF444655),
+    surfaceTint = Color(0xFF254fdf),
 
-    outline = NeutralPalette.Slate200,
-    outlineVariant = NeutralPalette.Slate150,
-    error = BrandPalette.Rose500,
-    onError = NeutralPalette.Slate0,
+    outline = Color(0xFF747686),
+    outlineVariant = Color(0xFFc4c5d7),
+    error = Color(0xFFba1a1a),
+    onError = Color(0xFFffffff),
 )
 
 internal val AirVibeDarkColors = darkColorScheme(
-    primary = BrandPalette.Indigo400,
-    onPrimary = NeutralPalette.Slate950,
-    primaryContainer = BrandPalette.Indigo800,
-    onPrimaryContainer = BrandPalette.Indigo100,
+    primary = Color(0xFFb8c3ff),
+    onPrimary = Color(0xFF001355),
+    primaryContainer = Color(0xFF0036bc),
+    onPrimaryContainer = Color(0xFFdde1ff),
 
-    secondary = BrandPalette.Cyan400,
-    onSecondary = NeutralPalette.Slate950,
-    secondaryContainer = BrandPalette.Indigo900,
-    onSecondaryContainer = BrandPalette.Cyan300,
+    secondary = Color(0xFFffb873),
+    onSecondary = Color(0xFF2d1600),
+    secondaryContainer = Color(0xFF6a3b00),
+    onSecondaryContainer = Color(0xFFffdcbf),
 
-    tertiary = BrandPalette.Emerald400,
-    onTertiary = NeutralPalette.Slate950,
-    tertiaryContainer = BrandPalette.Indigo900,
-    onTertiaryContainer = BrandPalette.Emerald400,
+    tertiary = Color(0xFF8ad0ed),
+    onTertiary = Color(0xFF001f29),
+    tertiaryContainer = Color(0xFF004d62),
+    onTertiaryContainer = Color(0xFFbaeaff),
 
-    background = NeutralPalette.Slate950,
-    onBackground = NeutralPalette.Slate50,
+    background = Color(0xFF1a1c1c),
+    onBackground = Color(0xFFf9f9f9),
 
-    surface = NeutralPalette.Slate900,
-    onSurface = NeutralPalette.Slate50,
-    surfaceVariant = NeutralPalette.Slate800,
-    onSurfaceVariant = NeutralPalette.Slate400,
-    surfaceTint = BrandPalette.Indigo400,
+    surface = Color(0xFF2f3131),
+    onSurface = Color(0xFFf0f1f1),
+    surfaceVariant = Color(0xFF444655),
+    onSurfaceVariant = Color(0xFFc4c5d7),
+    surfaceTint = Color(0xFFb8c3ff),
 
-    outline = NeutralPalette.Slate800,
-    outlineVariant = NeutralPalette.Slate850,
-    error = BrandPalette.Rose400,
-    onError = NeutralPalette.Slate950,
+    outline = Color(0xFF8e90a0),
+    outlineVariant = Color(0xFF444655),
+    error = Color(0xFFffdad6),
+    onError = Color(0xFF93000a),
 )

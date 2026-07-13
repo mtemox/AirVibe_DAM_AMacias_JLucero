@@ -24,88 +24,88 @@ import com.example.airvibe.R
  * shadcn/ui + Apple.
  */
 private val GeistGoogleFont = GoogleFont("Geist")
+private val VarelaRoundGoogleFont = GoogleFont("Varela Round")
 
-private val GeistProvider = GoogleFont.Provider(
+private val GoogleFontProvider = GoogleFont.Provider(
     providerAuthority = "com.google.android.gms.fonts",
     providerPackage = "com.google.android.gms",
     certificates = R.array.com_google_android_gms_fonts_certs,
 )
 
 val Geist: FontFamily = FontFamily(
-    Font(googleFont = GeistGoogleFont, fontProvider = GeistProvider, weight = FontWeight.Light, style = FontStyle.Normal),
-    Font(googleFont = GeistGoogleFont, fontProvider = GeistProvider, weight = FontWeight.Normal, style = FontStyle.Normal),
-    Font(googleFont = GeistGoogleFont, fontProvider = GeistProvider, weight = FontWeight.Medium, style = FontStyle.Normal),
-    Font(googleFont = GeistGoogleFont, fontProvider = GeistProvider, weight = FontWeight.SemiBold, style = FontStyle.Normal),
-    Font(googleFont = GeistGoogleFont, fontProvider = GeistProvider, weight = FontWeight.Bold, style = FontStyle.Normal),
+    Font(googleFont = GeistGoogleFont, fontProvider = GoogleFontProvider, weight = FontWeight.Light, style = FontStyle.Normal),
+    Font(googleFont = GeistGoogleFont, fontProvider = GoogleFontProvider, weight = FontWeight.Normal, style = FontStyle.Normal),
+    Font(googleFont = GeistGoogleFont, fontProvider = GoogleFontProvider, weight = FontWeight.Medium, style = FontStyle.Normal),
+    Font(googleFont = GeistGoogleFont, fontProvider = GoogleFontProvider, weight = FontWeight.SemiBold, style = FontStyle.Normal),
+    Font(googleFont = GeistGoogleFont, fontProvider = GoogleFontProvider, weight = FontWeight.Bold, style = FontStyle.Normal),
+)
+
+val VarelaRound: FontFamily = FontFamily(
+    Font(resId = R.font.varela_round, weight = FontWeight.Light, style = FontStyle.Normal),
+    Font(resId = R.font.varela_round, weight = FontWeight.Normal, style = FontStyle.Normal),
+    Font(resId = R.font.varela_round, weight = FontWeight.Medium, style = FontStyle.Normal),
+    Font(resId = R.font.varela_round, weight = FontWeight.SemiBold, style = FontStyle.Normal),
+    Font(resId = R.font.varela_round, weight = FontWeight.Bold, style = FontStyle.Normal),
 )
 
 /**
- * Sistema tipográfico completo de AirVibe. Hereda la familia [Geist]
- * y mantiene una jerarquía que va desde titulares display hasta
- * microcopys de apoyo.
+ * Sistema tipográfico completo de AirVibe. Hereda la familia [Geist] y [VarelaRound].
  */
 val AirVibeTypography: Typography = Typography(
 
     displayLarge = TextStyle(
-        fontFamily = Geist,
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 44.sp,
-        lineHeight = 50.sp,
-        letterSpacing = (-1.2).sp,
+        fontFamily = VarelaRound,
+        fontWeight = FontWeight.Normal,
+        fontSize = 32.sp,
+        lineHeight = 40.sp,
     ),
     displayMedium = TextStyle(
-        fontFamily = Geist,
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 34.sp,
-        lineHeight = 40.sp,
-        letterSpacing = (-0.8).sp,
+        fontFamily = VarelaRound,
+        fontWeight = FontWeight.Normal,
+        fontSize = 28.sp,
+        lineHeight = 36.sp,
     ),
     displaySmall = TextStyle(
-        fontFamily = Geist,
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 28.sp,
-        lineHeight = 34.sp,
-        letterSpacing = (-0.4).sp,
+        fontFamily = VarelaRound,
+        fontWeight = FontWeight.Normal,
+        fontSize = 24.sp,
+        lineHeight = 32.sp,
     ),
 
     headlineLarge = TextStyle(
-        fontFamily = Geist,
-        fontWeight = FontWeight.SemiBold,
+        fontFamily = VarelaRound,
+        fontWeight = FontWeight.Normal,
         fontSize = 24.sp,
-        lineHeight = 30.sp,
-        letterSpacing = (-0.2).sp,
+        lineHeight = 32.sp,
     ),
     headlineMedium = TextStyle(
-        fontFamily = Geist,
-        fontWeight = FontWeight.SemiBold,
+        fontFamily = VarelaRound,
+        fontWeight = FontWeight.Normal,
         fontSize = 20.sp,
-        lineHeight = 26.sp,
-        letterSpacing = (-0.1).sp,
+        lineHeight = 28.sp,
     ),
     headlineSmall = TextStyle(
-        fontFamily = Geist,
-        fontWeight = FontWeight.Medium,
+        fontFamily = VarelaRound,
+        fontWeight = FontWeight.Normal,
         fontSize = 18.sp,
         lineHeight = 24.sp,
-        letterSpacing = 0.sp,
     ),
 
     titleLarge = TextStyle(
-        fontFamily = Geist,
-        fontWeight = FontWeight.SemiBold,
+        fontFamily = VarelaRound,
+        fontWeight = FontWeight.Normal,
         fontSize = 17.sp,
         lineHeight = 22.sp,
-        letterSpacing = (-0.1).sp,
     ),
     titleMedium = TextStyle(
-        fontFamily = Geist,
+        fontFamily = VarelaRound,
         fontWeight = FontWeight.Medium,
         fontSize = 15.sp,
         lineHeight = 20.sp,
         letterSpacing = 0.sp,
     ),
     titleSmall = TextStyle(
-        fontFamily = Geist,
+        fontFamily = VarelaRound,
         fontWeight = FontWeight.Medium,
         fontSize = 13.sp,
         lineHeight = 18.sp,
@@ -113,21 +113,21 @@ val AirVibeTypography: Typography = Typography(
     ),
 
     bodyLarge = TextStyle(
-        fontFamily = Geist,
+        fontFamily = VarelaRound,
         fontWeight = FontWeight.Normal,
         fontSize = 15.sp,
         lineHeight = 22.sp,
         letterSpacing = 0.sp,
     ),
     bodyMedium = TextStyle(
-        fontFamily = Geist,
+        fontFamily = VarelaRound,
         fontWeight = FontWeight.Normal,
         fontSize = 14.sp,
         lineHeight = 20.sp,
         letterSpacing = 0.sp,
     ),
     bodySmall = TextStyle(
-        fontFamily = Geist,
+        fontFamily = VarelaRound,
         fontWeight = FontWeight.Normal,
         fontSize = 12.sp,
         lineHeight = 16.sp,
@@ -135,21 +135,21 @@ val AirVibeTypography: Typography = Typography(
     ),
 
     labelLarge = TextStyle(
-        fontFamily = Geist,
+        fontFamily = VarelaRound,
         fontWeight = FontWeight.Medium,
         fontSize = 14.sp,
         lineHeight = 18.sp,
         letterSpacing = 0.1.sp,
     ),
     labelMedium = TextStyle(
-        fontFamily = Geist,
+        fontFamily = VarelaRound,
         fontWeight = FontWeight.Medium,
         fontSize = 12.sp,
         lineHeight = 16.sp,
         letterSpacing = 0.2.sp,
     ),
     labelSmall = TextStyle(
-        fontFamily = Geist,
+        fontFamily = VarelaRound,
         fontWeight = FontWeight.Medium,
         fontSize = 11.sp,
         lineHeight = 14.sp,

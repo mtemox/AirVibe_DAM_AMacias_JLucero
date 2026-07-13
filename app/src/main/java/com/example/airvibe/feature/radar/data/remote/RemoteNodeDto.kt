@@ -16,6 +16,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 internal data class RemoteNodeDto(
     @SerialName("id") val id: String,
+    @SerialName("owner_id") val ownerId: String,
     @SerialName("display_name") val displayName: String,
     @SerialName("status") val status: String,
     @SerialName("detail") val detail: String,
@@ -31,8 +32,9 @@ internal data class RemoteNodeDto(
     @SerialName("created_at") val createdAt: String? = null,
 )
 
-internal fun NodeEntity.toRemoteDto(): RemoteNodeDto = RemoteNodeDto(
+internal fun NodeEntity.toRemoteDto(ownerId: String): RemoteNodeDto = RemoteNodeDto(
     id = id,
+    ownerId = ownerId,
     displayName = displayName,
     status = status,
     detail = detail,
@@ -59,6 +61,24 @@ internal fun RemoteNodeDto.toDomain(): RemoteNode = RemoteNode(
     accentColorArgb = accentColorArgb,
     tags = tags,
     isFavorite = isFavorite,
+    updatedAt = updatedAt?.toEpochMillis() ?: System.currentTimeMillis(),
+    createdAt = createdAt?.toEpochMillis() ?: System.currentTimeMillis(),
+)
+
+internal fun RemoteNodeDto.toEntity(): NodeEntity = NodeEntity(
+    id = id,
+    displayName = displayName,
+    status = status,
+    detail = detail,
+    kind = kind,
+    presence = presence,
+    angleDegrees = angleDegrees.toFloat(),
+    distanceNormalized = distanceNormalized.toFloat(),
+    signalStrength = signalStrength.toFloat(),
+    accentColorArgb = accentColorArgb.toInt(),
+    tags = tags,
+    isFavorite = isFavorite,
+    isSynced = true,
     updatedAt = updatedAt?.toEpochMillis() ?: System.currentTimeMillis(),
     createdAt = createdAt?.toEpochMillis() ?: System.currentTimeMillis(),
 )
