@@ -28,6 +28,7 @@ import com.example.airvibe.feature.radar.presentation.RadarScreen
 import com.example.airvibe.core.di.ServiceLocator
 import com.example.airvibe.feature.auth.presentation.components.SplashScreen
 import com.example.airvibe.feature.auth.presentation.components.OnboardingScreen
+import com.example.airvibe.feature.chat.domain.state.ActiveChatState
 
 class MainActivity : ComponentActivity() {
 
@@ -50,6 +51,16 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         deepLinkState.value = parseDeepLink(intent)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        ActiveChatState.setAppInForeground(true)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        ActiveChatState.setAppInForeground(false)
     }
 
     private fun parseDeepLink(intent: Intent?): AppDeepLink? {

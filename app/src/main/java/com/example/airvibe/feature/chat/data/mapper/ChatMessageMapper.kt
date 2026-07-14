@@ -26,6 +26,7 @@ object ChatMessageMapper {
         kind = kind.toKind(),
         createdAt = createdAt,
         isSynced = isSynced,
+        isRead = isRead,
     )
 
     fun ChatMessage.toEntity(): ChatMessageEntity = ChatMessageEntity(
@@ -37,6 +38,7 @@ object ChatMessageMapper {
         kind = kind.name,
         createdAt = createdAt,
         isSynced = isSynced,
+        isRead = isRead,
     )
 
     fun ConversationSummaryRow.toSummary(): ConversationSummary = ConversationSummary(
@@ -44,7 +46,7 @@ object ChatMessageMapper {
         displayName = displayName,
         lastMessage = lastMessage,
         lastTimestamp = lastTimestamp,
-        unreadCount = 0, // futuro: integrar flags de "leído"
+        unreadCount = unreadCount,
         isGroupInvite = kind.equals(MessageKind.GroupInvite.name, ignoreCase = true),
     )
 

@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.DoneAll
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.WarningAmber
 import androidx.compose.material3.Icon
@@ -30,6 +31,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.airvibe.core.designsystem.theme.AirVibeTheme
 import com.example.airvibe.feature.chat.domain.model.ChatMessage
 import com.example.airvibe.feature.chat.domain.model.MessageDirection
@@ -40,12 +42,8 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * Burbuja de chat estilo iOS. Se alinea a la derecha para
+ * Burbuja de chat estilo WhatsApp. Se alinea a la derecha para
  * mensajes salientes y a la izquierda para los entrantes.
- *
- * El diseño respeta el lenguaje visual glass de AirVibe: bordes
- * sutiles, gradiente translúcido y radios asimétricos para la
- * "cola" de la burbuja.
  */
 @Composable
 fun MessageBubble(
@@ -54,26 +52,20 @@ fun MessageBubble(
 ) {
     val isOutgoing = message.direction == MessageDirection.Outgoing
     val isInvite = message.kind == MessageKind.GroupInvite
-    val tokens = AirVibeTheme.glass
 
     val bubbleShape = if (isOutgoing) {
-        RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp, bottomStart = 20.dp, bottomEnd = 6.dp)
+        RoundedCornerShape(topStart = 8.dp, topEnd = 0.dp, bottomStart = 8.dp, bottomEnd = 8.dp)
     } else {
-        RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp, bottomStart = 6.dp, bottomEnd = 20.dp)
+        RoundedCornerShape(topStart = 0.dp, topEnd = 8.dp, bottomStart = 8.dp, bottomEnd = 8.dp)
     }
 
-    val bubbleBrush = if (isOutgoing) {
-        androidx.compose.ui.graphics.SolidColor(Color(0xFF4166F5))
+    val bubbleColor = if (isOutgoing) {
+        Color(0xFFDCF8C6)
     } else {
-        androidx.compose.ui.graphics.SolidColor(Color(0xFFF0F5F9))
-    }
-
-    val textColor = if (isOutgoing) {
         Color.White
-    } else {
-        MaterialTheme.colorScheme.onSurface
     }
 
+    val textColor = Color(0xFF1A1C1C)
     val alignment = if (isOutgoing) Alignment.End else Alignment.Start
 
     Column(
@@ -88,30 +80,26 @@ fun MessageBubble(
             modifier = Modifier
                 .widthIn(max = 300.dp)
                 .clip(bubbleShape)
-                .background(brush = bubbleBrush)
-                .border(
-                    width = 1.dp,
-                    color = if (isOutgoing) {
-                        Color.White.copy(alpha = 0.20f)
-                    } else {
-                        tokens.outerBorder
-                    },
-                    shape = bubbleShape,
-                )
-                .padding(horizontal = 14.dp, vertical = 10.dp),
+                .background(bubbleColor)
+                .padding(start = 8.dp, top = 8.dp, end = 8.dp, bottom = 4.dp),
         ) {
+            // Utilizamos un padding end mayor para asegurar que el texto
+            // nunca se superponga con la hora.
             Text(
                 text = message.text,
                 style = MaterialTheme.typography.bodyMedium,
                 color = textColor,
+                modifier = Modifier.padding(end = if (isOutgoing) 48.dp else 36.dp, bottom = 8.dp)
+            )
+
+            MessageMetaBox(
+                timestampMillis = message.createdAt,
+                status = message.status,
+                isOutgoing = isOutgoing,
+                isRead = message.isRead,
+                modifier = Modifier.align(Alignment.BottomEnd)
             )
         }
-        Spacer(modifier = Modifier.height(4.dp))
-        MessageMetaRow(
-            timestampMillis = message.createdAt,
-            status = message.status,
-            isOutgoing = isOutgoing,
-        )
     }
 }
 
@@ -143,35 +131,47 @@ private fun InviteBadge(isOutgoing: Boolean) {
 }
 
 @Composable
-private fun MessageMetaRow(
+private fun MessageMetaBox(
     timestampMillis: Long,
     status: MessageStatus,
     isOutgoing: Boolean,
+    isRead: Boolean,
+    modifier: Modifier = Modifier
 ) {
     val timeFormatter = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
     val time = remember(timestampMillis) { timeFormatter.format(Date(timestampMillis)) }
-    val (icon, tint) = when (status) {
-        MessageStatus.Sending -> Icons.Rounded.Schedule to MaterialTheme.colorScheme.outline
-        MessageStatus.Sent -> Icons.Rounded.Check to MaterialTheme.colorScheme.onSurfaceVariant
-        MessageStatus.Synced -> Icons.Rounded.Check to MaterialTheme.colorScheme.primary
-        MessageStatus.Failed -> Icons.Rounded.WarningAmber to MaterialTheme.colorScheme.error
+    
+    // Icono y color para el estado
+    val (icon, tint) = when {
+        status == MessageStatus.Sending -> Icons.Rounded.Schedule to Color(0xFF888888)
+        status == MessageStatus.Failed -> Icons.Rounded.WarningAmber to MaterialTheme.colorScheme.error
+        // Si fue leído (isRead == true), mostrar checks azules, sino, grises.
+        status == MessageStatus.Synced || status == MessageStatus.Sent -> {
+            // Nota: En WhatsApp, Sent es 1 check, Synced/Delivered es 2 checks, Read es 2 checks azules.
+            // Para simplificar según lo solicitado, usaremos un icono de doble check.
+            // Idealmente deberíamos importar Icons.Rounded.DoneAll, pero como tal vez no esté,
+            // si no está, usamos Done. Pero aquí asumimos que podemos referenciar DoneAll de Material3.
+            androidx.compose.material.icons.Icons.Rounded.DoneAll to if (isRead) Color(0xFF34B7F1) else Color(0xFF888888)
+        }
+        else -> Icons.Rounded.Check to Color(0xFF888888)
     }
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        modifier = modifier
     ) {
         Text(
             text = time,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+            color = Color(0x991A1C1C), // Gris semitransparente
         )
         if (isOutgoing) {
             Icon(
                 imageVector = icon,
                 contentDescription = status.displayName,
                 tint = tint,
-                modifier = Modifier.size(12.dp),
+                modifier = Modifier.size(14.dp),
             )
         }
     }

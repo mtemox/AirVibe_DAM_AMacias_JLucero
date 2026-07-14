@@ -26,6 +26,7 @@ import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.airvibe.feature.main.presentation.components.DrawerContent
 
 enum class MainTab(val title: String, val icon: ImageVector) {
@@ -59,6 +60,36 @@ fun MainScreen(
             )
         }
     ) {
+        val currentAlert by com.example.airvibe.feature.chat.presentation.components.RoomInviteAlertManager.currentAlert.collectAsStateWithLifecycle()
+
+        if (currentAlert != null) {
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { com.example.airvibe.feature.chat.presentation.components.RoomInviteAlertManager.dismiss() },
+                title = { Text(text = "¡Nueva Invitación!") },
+                text = {
+                    Text(text = "El anfitrión ${currentAlert!!.hostName} te ha invitado a unirte a la sala: ${currentAlert!!.roomTitle}.")
+                },
+                confirmButton = {
+                    androidx.compose.material3.TextButton(
+                        onClick = {
+                            // Si el usuario presiona "Ver Grupos", podemos cerrarlo y navegar, o solo cerrarlo.
+                            com.example.airvibe.feature.chat.presentation.components.RoomInviteAlertManager.dismiss()
+                            currentTab = MainTab.Groups
+                        }
+                    ) {
+                        Text("Ver en Grupos")
+                    }
+                },
+                dismissButton = {
+                    androidx.compose.material3.TextButton(
+                        onClick = { com.example.airvibe.feature.chat.presentation.components.RoomInviteAlertManager.dismiss() }
+                    ) {
+                        Text("Cerrar")
+                    }
+                }
+            )
+        }
+
         Scaffold(
             bottomBar = {
                 NavigationBar {

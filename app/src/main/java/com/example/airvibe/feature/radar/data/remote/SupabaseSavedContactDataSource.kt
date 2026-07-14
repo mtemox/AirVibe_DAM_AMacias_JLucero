@@ -23,6 +23,15 @@ class SupabaseSavedContactDataSource(
             .decodeList<RemoteSavedContactDto>()
     }
 
+    suspend fun delete(peerNodeId: String, ownerId: String): Result<Unit> = runCatching {
+        supabase.postgrest.from(TABLE).delete {
+            filter {
+                eq("owner_id", ownerId)
+                eq("peer_node_id", peerNodeId)
+            }
+        }
+    }
+
     companion object {
         const val TABLE = "saved_contacts"
     }

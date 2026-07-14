@@ -14,7 +14,9 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import com.example.airvibe.feature.chat.domain.state.ActiveChatState
 
 /**
  * ViewModel de la pantalla de chat. Sigue MVVM con un único
@@ -35,8 +37,21 @@ class ChatViewModel(
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
 
     init {
+        ActiveChatState.setPeerChat(peerNodeId)
         observeMessages()
         loadPeerDisplayName()
+        markAsRead()
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        ActiveChatState.setPeerChat(null)
+    }
+
+    private fun markAsRead() {
+        viewModelScope.launch {
+            chatRepository.markConversationAsRead(peerNodeId)
+        }
     }
 
     private fun observeMessages() {
@@ -44,6 +59,7 @@ class ChatViewModel(
             chatRepository.observeConversation(peerNodeId)
                 .onEach { messages ->
                     _uiState.update { it.copy(messages = messages, errorMessage = null) }
+                    markAsRead()
                 }
                 .catch { throwable ->
                     _uiState.update {

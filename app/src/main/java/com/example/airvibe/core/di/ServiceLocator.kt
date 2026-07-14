@@ -143,6 +143,12 @@ object ServiceLocator {
         SupabaseChatMessageDataSource(supabase = supabaseClient)
     }
 
+    private val chatNotificationsManager: com.example.airvibe.feature.chat.data.notification.ChatMessageNotificationManager by lazy {
+        com.example.airvibe.feature.chat.data.notification.ChatMessageNotificationManager(
+            requireNotNull(appContext) { "ServiceLocator.init(context) required." }
+        )
+    }
+
     val cloudSyncService: CloudSyncService by lazy {
         CloudSyncService(
             savedContactDao = savedContactDao,
@@ -154,6 +160,7 @@ object ServiceLocator {
             roomMessageRemote = roomMessageRemoteDataSource,
             chatMessageRemote = chatMessageRemoteDataSource,
             telemetryRemote = telemetryRemoteDataSource,
+            chatNotifications = chatNotificationsManager,
         )
     }
 
@@ -267,6 +274,7 @@ object ServiceLocator {
                 }
             },
             handshakeNotifications = handshakeRequestNotificationManager,
+            chatNotifications = chatMessageNotificationManager,
         )
     }
 
@@ -298,6 +306,13 @@ object ServiceLocator {
             "ServiceLocator.init(context) must be called before accessing the handshake manager."
         }
         HandshakeRequestNotificationManager(appContext!!)
+    }
+
+    val chatMessageNotificationManager: com.example.airvibe.feature.chat.data.notification.ChatMessageNotificationManager by lazy {
+        requireNotNull(appContext) {
+            "ServiceLocator.init(context) must be called before accessing the chat notification manager."
+        }
+        com.example.airvibe.feature.chat.data.notification.ChatMessageNotificationManager(appContext!!)
     }
 
     @Volatile

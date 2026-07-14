@@ -8,11 +8,10 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -20,12 +19,14 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -35,6 +36,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.airvibe.core.designsystem.components.AirVibeAmbientBackground
@@ -52,17 +55,29 @@ fun GroupRoomScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
+
+    LaunchedEffect(state.messages.size) {
+        if (state.messages.isNotEmpty()) {
+            listState.animateScrollToItem(0)
+        }
+    }
+
     val room = state.room
     var composer by remember { mutableStateOf("") }
     val loadError = state.loadError
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        AirVibeAmbientBackground()
+    Box(modifier = Modifier.fillMaxSize().background(Color(0xFFFFA84D))) {
+        androidx.compose.foundation.Image(
+            painter = androidx.compose.ui.res.painterResource(id = com.example.airvibe.R.drawable.wave_pattern),
+            contentDescription = null,
+            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+            modifier = Modifier.fillMaxSize(),
+            alpha = 0.5f
+        )
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .statusBarsPadding()
-                .navigationBarsPadding(),
+                .safeDrawingPadding(),
         ) {
             ChatTopBar(
                 peerDisplayName = room?.title ?: "Sala cercana",
@@ -166,31 +181,83 @@ fun GroupRoomScreen(
 
 @Composable
 private fun RoomMessageBubble(message: RoomMessage) {
-    val maxBubbleWidth = (LocalConfiguration.current.screenWidthDp * 0.78f).dp
-    val bg = if (message.isOwn) {
-        MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+    val maxBubbleWidth = (LocalConfiguration.current.screenWidthDp * 0.85f).dp
+    val bubbleShape = if (message.isOwn) {
+        RoundedCornerShape(topStart = 8.dp, topEnd = 0.dp, bottomStart = 8.dp, bottomEnd = 8.dp)
     } else {
-        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f)
+        RoundedCornerShape(topStart = 0.dp, topEnd = 8.dp, bottomStart = 8.dp, bottomEnd = 8.dp)
     }
+    val bubbleColor = if (message.isOwn) {
+        Color(0xFFDCF8C6)
+    } else {
+        Color.White
+    }
+
     Column(
-        modifier = Modifier
-            .widthIn(max = maxBubbleWidth)
-            .clip(RoundedCornerShape(18.dp))
-            .background(bg)
-            .padding(horizontal = 14.dp, vertical = 10.dp),
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = if (message.isOwn) Alignment.End else Alignment.Start,
     ) {
-        if (!message.isOwn) {
-            Text(
-                text = message.senderName,
-                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
-                color = MaterialTheme.colorScheme.primary,
+        Box(
+            modifier = Modifier
+                .widthIn(max = maxBubbleWidth)
+                .clip(bubbleShape)
+                .background(bubbleColor)
+                .padding(start = 8.dp, top = 8.dp, end = 8.dp, bottom = 4.dp),
+        ) {
+            Column(
+                modifier = Modifier.padding(end = if (message.isOwn) 48.dp else 36.dp, bottom = 8.dp)
+            ) {
+                if (!message.isOwn) {
+                    Text(
+                        text = message.senderName,
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(bottom = 2.dp)
+                    )
+                }
+                Text(
+                    text = message.text,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color(0xFF1A1C1C),
+                )
+            }
+
+            RoomMessageMetaBox(
+                timestampMillis = message.createdAt,
+                isOwn = message.isOwn,
+                modifier = Modifier.align(Alignment.BottomEnd)
             )
         }
+    }
+}
+
+@Composable
+private fun RoomMessageMetaBox(
+    timestampMillis: Long,
+    isOwn: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val timeFormatter = remember { java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()) }
+    val time = remember(timestampMillis) { timeFormatter.format(java.util.Date(timestampMillis)) }
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        modifier = modifier
+    ) {
         Text(
-            text = message.text,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface,
+            text = time,
+            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+            color = Color(0x991A1C1C),
         )
+        if (isOwn) {
+            Icon(
+                imageVector = Icons.Rounded.Check,
+                contentDescription = "Sent",
+                tint = Color(0xFF888888),
+                modifier = Modifier.size(14.dp),
+            )
+        }
     }
 }
 
@@ -200,11 +267,6 @@ private fun groupRoomViewModel(roomId: String): GroupRoomViewModel {
     return viewModel(factory = factory, key = "room:$roomId")
 }
 
-/**
- * Feature 4 — Cabecera con la lista de miembros activos de la
- * sala. Se renderiza como un bloque nuevo al inicio de la
- * pantalla, sin reemplazar la top bar ni la lista de mensajes.
- */
 @Composable
 private fun RoomMembersHeader(
     memberCount: Int,

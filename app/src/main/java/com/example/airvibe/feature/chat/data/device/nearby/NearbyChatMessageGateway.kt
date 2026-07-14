@@ -7,6 +7,7 @@ import com.example.airvibe.feature.chat.data.repository.ChatRepositoryImpl
 import com.example.airvibe.feature.chat.data.repository.ProximityRoomRepositoryImpl
 import com.example.airvibe.feature.chat.domain.model.MessageKind
 import com.example.airvibe.feature.chat.domain.scanner.ChatMessageGateway
+import com.example.airvibe.feature.chat.presentation.components.RoomInviteAlertManager
 import com.example.airvibe.feature.radar.data.device.handshake.HandshakeRequestNotificationManager
 import com.example.airvibe.feature.radar.domain.model.HandshakeRequest
 import com.example.airvibe.feature.radar.domain.model.PresenceStatus
@@ -36,6 +37,7 @@ class NearbyChatMessageGateway(
     private val radarRepository: RadarRepository,
     private val onPeerBound: ((nodeId: String, endpointId: String) -> Unit)? = null,
     private val handshakeNotifications: HandshakeRequestNotificationManager? = null,
+    private val chatNotifications: com.example.airvibe.feature.chat.data.notification.ChatMessageNotificationManager? = null,
 ) : ChatMessageGateway {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -118,7 +120,7 @@ class NearbyChatMessageGateway(
 
     override suspend fun sendRoomMessage(roomId: String, text: String, messageId: String): Boolean {
         val localId = localUserIdProvider()
-        val endpoints = resolveRoomEndpoints(localId)
+        val endpoints = resolveRoomEndpoints(localId, roomId)
         if (endpoints.isEmpty()) return false
         val bytes = NearbyChatPayloadCodec.encodeRoomMessage(
             messageId = messageId,
@@ -141,11 +143,20 @@ class NearbyChatMessageGateway(
         return delivered > 0
     }
 
-    private suspend fun resolveRoomEndpoints(localNodeId: String): List<String> = mutex.withLock {
-        // endpointToNode.keys are endpointIds (not nodeIds) — use them directly
-        val fromBindings = endpointToNode.keys
-        val fromScanner = connectedEndpointsProvider()
-        (fromBindings + fromScanner).distinct()
+    private suspend fun resolveRoomEndpoints(localNodeId: String, roomId: String): List<String> {
+        val room = roomRepository.getRoom(roomId) ?: return emptyList()
+        return mutex.withLock {
+            if (room.isHost) {
+                // Soy el anfitrión, envío a los invitados que están en roomEndpoints
+                roomMutex.withLock {
+                    roomEndpoints[roomId]?.toList().orEmpty()
+                }
+            } else {
+                // Soy un invitado, envío solo al anfitrión
+                val hostEndpoint = nodeToEndpoint[room.hostNodeId]
+                if (hostEndpoint != null) listOf(hostEndpoint) else emptyList()
+            }
+        }
     }
 
     override suspend fun sendFriendAdd(targetNodeId: String): Boolean {
@@ -299,11 +310,17 @@ class NearbyChatMessageGateway(
         when (decoded.kind) {
             NearbyChatPayloadKind.Chat -> {
                 scope.launch {
+                    val senderName = decoded.senderDisplayName ?: radarRepository.getProfile(senderNodeId)?.displayName ?: "Contacto"
                     chatRepository.persistIncoming(
                         peerNodeId = senderNodeId,
                         text = decoded.text,
                         kind = MessageKind.Text,
                         createdAt = decoded.createdAtMillis,
+                    )
+                    chatNotifications?.postDirectMessage(
+                        senderNodeId = senderNodeId,
+                        senderName = senderName,
+                        text = decoded.text,
                     )
                 }
             }
@@ -336,13 +353,39 @@ class NearbyChatMessageGateway(
                             hostName = hostName,
                             roomTitle = decoded.text,
                         )
+                        // Añadir grupo al radar para que sea visible ahí también
+                        val roomNode = RadarNode(
+                            id = "room:$roomId",
+                            displayName = decoded.text,
+                            status = "Invitación de $hostName",
+                            detail = "Sala de proximidad — ${decoded.text}",
+                            kind = RadarNodeKind.Group,
+                            presence = PresenceStatus.Online,
+                            angleDegrees = (roomId.hashCode().toLong() and 0xFFFFFFFFL)
+                                .let { ((it % 360).toInt()).toFloat() }
+                                .coerceIn(0f, 359.9f),
+                            distanceNormalized = 0.18f,
+                            signalStrength = 0.95f,
+                            accentColor = androidx.compose.ui.graphics.Color(0xFF8B5CF6),
+                            tags = listOf("Sala", roomId),
+                        )
+                        radarRepository.upsertNode(roomNode)
+                        // Disparar la alerta in-app
+                        RoomInviteAlertManager.showInvite(roomId, decoded.text, hostName)
                     }
                 }
             }
             NearbyChatPayloadKind.RoomMessage -> {
                 val roomId = decoded.roomId ?: return false
                 if (decoded.senderNodeId == localUserIdProvider()) return true
+                
                 scope.launch {
+                    val room = roomRepository.getRoom(roomId)
+                    if (room == null || !room.joined) {
+                        // Ignoramos mensajes de grupos a los que no nos hemos unido
+                        return@launch
+                    }
+
                     val senderName = decoded.senderDisplayName?.takeIf { it.isNotBlank() }
                         ?: radarRepository.getProfile(senderNodeId)?.displayName
                         ?: "Usuario cercano"
@@ -357,6 +400,14 @@ class NearbyChatMessageGateway(
                         text = decoded.text,
                         createdAt = normalizedTime,
                         messageId = decoded.messageId,
+                    )
+                    
+                    val roomTitle = roomRepository.getRoom(roomId)?.title ?: ""
+                    chatNotifications?.postRoomMessage(
+                        roomId = roomId,
+                        senderName = senderName,
+                        roomTitle = roomTitle,
+                        text = decoded.text,
                     )
                 }
             }

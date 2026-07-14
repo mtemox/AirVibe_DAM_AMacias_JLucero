@@ -28,6 +28,8 @@ import androidx.room.PrimaryKey
         Index(value = ["node_id"]),
         Index(value = ["is_synced"]),
         Index(value = ["created_at"]),
+        Index(value = ["is_read"]),
+        Index(value = ["is_deleted"]),
     ],
 )
 data class ChatMessageEntity(
@@ -55,4 +57,10 @@ data class ChatMessageEntity(
 
     @ColumnInfo(name = "is_synced", defaultValue = "0")
     val isSynced: Boolean = false,
+
+    @ColumnInfo(name = "is_read", defaultValue = "1")
+    val isRead: Boolean = true,
+
+    @ColumnInfo(name = "is_deleted", defaultValue = "0")
+    val isDeleted: Boolean = false,
 )

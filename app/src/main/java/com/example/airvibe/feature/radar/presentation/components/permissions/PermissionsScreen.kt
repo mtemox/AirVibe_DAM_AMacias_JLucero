@@ -182,8 +182,12 @@ fun PermissionsScreen(
                     isGranted = locationGranted
                 )
 
-                // Mock Notifications
-                var notifGranted by remember { mutableStateOf(true) }
+                val notifGranted = state.permissions.any { p -> 
+                    p.name.contains("NOTIFICATIONS", ignoreCase = true) 
+                } && !state.missing.any { p -> 
+                    p.name.contains("NOTIFICATIONS", ignoreCase = true) 
+                }
+
                 PermissionToggleCard(
                     title = "Notifications",
                     description = "Alerts you when a peer is nearby or when you receive offline messages through the mesh network.",

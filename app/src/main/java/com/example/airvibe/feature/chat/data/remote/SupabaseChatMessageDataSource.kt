@@ -31,6 +31,15 @@ class SupabaseChatMessageDataSource(
             .decodeList<RemoteChatMessageDto>()
     }
 
+    suspend fun deleteByNode(nodeId: String, ownerId: String): Result<Unit> = runCatching {
+        supabase.postgrest.from(TABLE).delete {
+            filter {
+                eq("owner_id", ownerId)
+                eq("node_id", nodeId)
+            }
+        }
+    }
+
     companion object {
         const val TABLE = "chat_messages"
     }

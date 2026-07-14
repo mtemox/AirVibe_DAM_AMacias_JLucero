@@ -26,4 +26,5 @@ data class ChatMessage(
     val kind: MessageKind,
     val createdAt: Long,
     val isSynced: Boolean,
+    val isRead: Boolean = true,
 )

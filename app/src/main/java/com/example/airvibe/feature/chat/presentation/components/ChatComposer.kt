@@ -5,7 +5,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -16,7 +15,11 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Send
+import androidx.compose.material.icons.rounded.AttachFile
 import androidx.compose.material.icons.rounded.BroadcastOnPersonal
+import androidx.compose.material.icons.rounded.Mic
+import androidx.compose.material.icons.rounded.Mood
+import androidx.compose.material.icons.rounded.PhotoCamera
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
@@ -25,25 +28,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
-import com.example.airvibe.core.designsystem.modifiers.glassBlur
-import com.example.airvibe.core.designsystem.theme.AirVibeTheme
+import androidx.compose.ui.unit.sp
 
-/**
- * Barra inferior del chat con el campo de texto y dos acciones:
- *
- *  - **Enviar** (icono avión de papel) → mensaje 1-a-1.
- *  - **Broadcast** (icono antena) → envía a TODOS los peers
- *    conectados (tipo invitación a grupo).
- *
- * Sigue la estética glass: fondo translúcido, highlight y sombra
- * suave para elevarse sobre la lista de mensajes.
- */
 @Composable
 fun ChatComposer(
     value: String,
@@ -56,47 +50,44 @@ fun ChatComposer(
     showBroadcast: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
-    val tokens = AirVibeTheme.glass
-    val shape = RoundedCornerShape(28.dp)
-
-    Box(
+    Row(
+        verticalAlignment = Alignment.Bottom,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 12.dp, vertical = 8.dp)
-            .glassBlur(radius = 18.dp, shape = shape)
-            .clip(shape)
-            .background(tokens.surfaceFillStrong)
-            .padding(horizontal = 10.dp, vertical = 6.dp),
+            .background(Color.Transparent),
     ) {
+        // Pill container for text input and secondary actions
         Row(
+            modifier = Modifier
+                .weight(1f)
+                .shadow(elevation = 1.dp, shape = RoundedCornerShape(24.dp))
+                .clip(RoundedCornerShape(24.dp))
+                .background(Color.White)
+                .padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            if (showBroadcast) {
-                ComposerActionIcon(
-                    icon = Icons.Rounded.BroadcastOnPersonal,
-                    enabled = enabled && !isBroadcasting,
-                    highlighted = isBroadcasting,
-                    contentDescription = "Enviar a todos",
-                    onClick = onBroadcast,
-                )
-            }
+            Icon(
+                imageVector = Icons.Rounded.Mood,
+                contentDescription = "Emoji",
+                tint = Color(0xFF747686),
+                modifier = Modifier.size(28.dp)
+            )
 
             Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .height(44.dp)
-                    .clip(RoundedCornerShape(22.dp))
-                    .background(tokens.surfaceFill)
-                    .padding(horizontal = 14.dp),
-                contentAlignment = Alignment.CenterStart,
+                modifier = Modifier.weight(1f),
+                contentAlignment = Alignment.CenterStart
             ) {
                 if (value.isEmpty()) {
                     Text(
-                        text = "Escribe un mensaje…",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                        text = "Mensaje",
+                        style = MaterialTheme.typography.bodyLarge.copy(
+                            fontSize = 18.dp.value.sp,
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.Medium
+                        ),
+                        color = Color(0xFF747686).copy(alpha = 0.8f),
                     )
                 }
                 BasicTextField(
@@ -105,59 +96,67 @@ fun ChatComposer(
                     enabled = enabled,
                     singleLine = false,
                     textStyle = LocalTextStyle.current.copy(
-                        color = MaterialTheme.colorScheme.onSurface,
+                        color = Color(0xFF1A1C1C),
+                        fontSize = 18.sp
                     ),
-                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                    cursorBrush = SolidColor(Color(0xFF075E54)),
                     keyboardOptions = KeyboardOptions(
-                        imeAction = ImeAction.Send,
+                        imeAction = ImeAction.Default,
                         capitalization = KeyboardCapitalization.Sentences,
                     ),
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
 
-            ComposerActionIcon(
-                icon = Icons.AutoMirrored.Rounded.Send,
-                enabled = enabled && value.isNotBlank(),
-                highlighted = isSending,
-                contentDescription = "Enviar mensaje",
-                onClick = onSend,
+            if (showBroadcast) {
+                Icon(
+                    imageVector = Icons.Rounded.BroadcastOnPersonal,
+                    contentDescription = "Broadcast",
+                    tint = if (isBroadcasting) Color(0xFF075E54) else Color(0xFF747686),
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clickableNoRipple(enabled = enabled && !isBroadcasting, onClick = onBroadcast)
+                )
+            }
+
+            Icon(
+                imageVector = Icons.Rounded.AttachFile,
+                contentDescription = "Attach",
+                tint = Color(0xFF747686),
+                modifier = Modifier.size(28.dp).padding(start = 4.dp)
+            )
+
+            Icon(
+                imageVector = Icons.Rounded.PhotoCamera,
+                contentDescription = "Camera",
+                tint = Color(0xFF747686),
+                modifier = Modifier.size(28.dp).padding(start = 4.dp)
             )
         }
-    }
-}
 
-@Composable
-private fun ComposerActionIcon(
-    icon: ImageVector,
-    enabled: Boolean,
-    highlighted: Boolean,
-    contentDescription: String,
-    onClick: () -> Unit,
-) {
-    val scheme = MaterialTheme.colorScheme
-    val tokens = AirVibeTheme.glass
-    val bg = when {
-        !enabled -> tokens.surfaceFill
-        highlighted -> scheme.primary
-        else -> scheme.primary.copy(alpha = 0.9f)
-    }
-    val fg = if (enabled) scheme.onPrimary else scheme.onSurfaceVariant
-
-    Box(
-        modifier = Modifier
-            .size(40.dp)
-            .clip(CircleShape)
-            .background(bg)
-            .clickableNoRipple(enabled = enabled, onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = contentDescription,
-            tint = fg,
-            modifier = Modifier.size(20.dp),
-        )
+        // Action button (Mic or Send)
+        val hasText = value.isNotBlank()
+        val actionIcon = if (hasText) Icons.AutoMirrored.Rounded.Send else Icons.Rounded.Mic
+        val actionDescription = if (hasText) "Enviar" else "Grabar"
+        
+        Box(
+            modifier = Modifier
+                .size(52.dp)
+                .shadow(elevation = 2.dp, shape = CircleShape)
+                .clip(CircleShape)
+                .background(Color(0xFF075E54))
+                .clickableNoRipple(enabled = enabled, onClick = {
+                    if (hasText) onSend() else {}
+                }),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = actionIcon,
+                contentDescription = actionDescription,
+                tint = Color.White,
+                modifier = Modifier.size(28.dp)
+            )
+        }
     }
 }
 

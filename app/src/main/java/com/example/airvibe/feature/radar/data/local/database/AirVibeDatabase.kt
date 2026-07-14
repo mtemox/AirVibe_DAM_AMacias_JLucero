@@ -56,7 +56,7 @@ abstract class AirVibeDatabase : RoomDatabase() {
 
     companion object {
         const val DATABASE_NAME = "airvibe.db"
-        const val SCHEMA_VERSION = 10
+        const val SCHEMA_VERSION = 12
 
         @Volatile
         private var instance: AirVibeDatabase? = null
@@ -83,6 +83,8 @@ abstract class AirVibeDatabase : RoomDatabase() {
                     MIGRATION_7_8,
                     MIGRATION_8_9,
                     MIGRATION_9_10,
+                    MIGRATION_10_11,
+                    MIGRATION_11_12,
                 )
                 .fallbackToDestructiveMigration(dropAllTables = false)
                 .build()
@@ -330,6 +332,38 @@ abstract class AirVibeDatabase : RoomDatabase() {
                 )
                 db.execSQL(
                     "CREATE INDEX IF NOT EXISTS index_profile_views_created ON profile_views(created_at)",
+                )
+            }
+        }
+        /**
+         * Feature 6 — Mensajes No Leídos.
+         * Añade la columna 'is_read' a chat_messages.
+         */
+        private val MIGRATION_10_11: Migration = object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE chat_messages ADD COLUMN is_read INTEGER NOT NULL DEFAULT 1",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_chat_messages_is_read ON chat_messages(is_read)",
+                )
+            }
+        }
+
+        /**
+         * Feature 7 — Borrado Offline.
+         * Añade la columna 'is_deleted' a chat_messages y saved_contacts.
+         */
+        private val MIGRATION_11_12: Migration = object : Migration(11, 12) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE chat_messages ADD COLUMN is_deleted INTEGER NOT NULL DEFAULT 0",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_chat_messages_is_deleted ON chat_messages(is_deleted)",
+                )
+                db.execSQL(
+                    "ALTER TABLE saved_contacts ADD COLUMN is_deleted INTEGER NOT NULL DEFAULT 0",
                 )
             }
         }

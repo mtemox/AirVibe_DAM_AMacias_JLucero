@@ -95,7 +95,7 @@ class RadarRepositoryImpl(
 
         return if (saved != null) {
 
-            savedContactDao.deleteById(nodeId)
+            savedContactDao.softDelete(nodeId)
 
             radarDao.getById(nodeId)?.let { radarDao.setFavorite(nodeId, false) }
 
@@ -166,8 +166,12 @@ class RadarRepositoryImpl(
 
 
     override suspend fun isSavedContact(nodeId: String): Boolean =
-
         savedContactDao.exists(nodeId)
+
+    override suspend fun deleteContact(nodeId: String) {
+        savedContactDao.softDelete(nodeId)
+        radarDao.getById(nodeId)?.let { radarDao.setFavorite(nodeId, false) }
+    }
 
 
 

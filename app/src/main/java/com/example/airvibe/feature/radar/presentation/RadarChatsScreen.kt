@@ -13,7 +13,9 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -52,6 +54,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -99,7 +103,7 @@ private object RadarDefaults {
     val ExpandedHeight = 2000.dp
 }
 
-@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun RadarChatsScreen(
     onOpenChat: (String) -> Unit = {},
@@ -120,6 +124,8 @@ fun RadarChatsScreen(
 
     val permissionsState = rememberRadarPermissionsState()
     var showPermissionsModal by remember { mutableStateOf(false) }
+
+    var chatToDelete by remember { mutableStateOf<MockChat?>(null) }
 
     val animatedRadarHeight by animateDpAsState(
         targetValue = if (isRadarExpanded) RadarDefaults.ExpandedHeight else radarHeight,
@@ -289,7 +295,10 @@ fun RadarChatsScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { onOpenChat(chat.nodeId) }
+                            .combinedClickable(
+                                onClick = { onOpenChat(chat.nodeId) },
+                                onLongClick = { chatToDelete = chat }
+                            )
                             .padding(horizontal = 16.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -398,6 +407,27 @@ fun RadarChatsScreen(
                     onDismiss = { showPermissionsModal = false }
                 )
             }
+        }
+        
+        if (chatToDelete != null) {
+            AlertDialog(
+                onDismissRequest = { chatToDelete = null },
+                title = { Text("Eliminar Chat") },
+                text = { Text("¿Estás seguro de que deseas eliminar el chat con ${chatToDelete?.name}? Esto borrará todo el historial.") },
+                confirmButton = {
+                    TextButton(onClick = {
+                        chatToDelete?.let { viewModel.deleteConversation(it.nodeId) }
+                        chatToDelete = null
+                    }) {
+                        Text("Eliminar", color = MaterialTheme.colorScheme.error)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { chatToDelete = null }) {
+                        Text("Cancelar")
+                    }
+                }
+            )
         }
 
 

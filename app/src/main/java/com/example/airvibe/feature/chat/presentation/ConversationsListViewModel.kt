@@ -43,6 +43,12 @@ class ConversationsListViewModel(
         }
     }
 
+    fun deleteConversation(nodeId: String) {
+        viewModelScope.launch {
+            chatRepository.clearConversation(nodeId)
+        }
+    }
+
     class Factory(
         @Suppress("UNUSED_PARAMETER") appContext: Application,
         private val chatRepository: ChatRepository = ServiceLocator.chatRepository,

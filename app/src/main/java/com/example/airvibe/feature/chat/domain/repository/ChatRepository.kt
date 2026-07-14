@@ -58,8 +58,14 @@ interface ChatRepository {
     /** Elimina el historial de chat con un peer. */
     suspend fun clearConversation(peerNodeId: String)
 
+    /** Marca todos los mensajes con este peer como leídos. */
+    suspend fun markConversationAsRead(peerNodeId: String)
+
     /** Envía un mensaje en una sala de proximidad. */
     suspend fun sendRoomMessage(roomId: String, text: String): com.example.airvibe.feature.chat.domain.model.RoomMessage
+
+    /** Envía la notificación de unión al anfitrión. */
+    suspend fun sendRoomJoin(roomId: String)
 }
 
 data class ConversationSummary(

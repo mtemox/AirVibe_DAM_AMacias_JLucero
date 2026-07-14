@@ -44,6 +44,7 @@ class CloudSyncService(
     private val roomMessageRemote: SupabaseRoomMessageDataSource,
     private val chatMessageRemote: SupabaseChatMessageDataSource,
     private val telemetryRemote: SupabaseTelemetryDataSource? = null,
+    private val chatNotifications: com.example.airvibe.feature.chat.data.notification.ChatMessageNotificationManager? = null,
 ) {
 
     /** Descarga datos de la nube e inserta lo que falta localmente. */
@@ -93,6 +94,14 @@ class CloudSyncService(
     }
 
     private suspend fun pushContacts(ownerId: String) {
+        val deletions = savedContactDao.getPendingDeletions()
+        deletions.forEach { entity ->
+            val result = savedContactRemote.delete(entity.nodeId, ownerId)
+            if (result.isSuccess) {
+                savedContactDao.hardDelete(entity.nodeId)
+            }
+        }
+
         val pending = savedContactDao.getPendingSync()
         if (pending.isEmpty()) return
         val dtos = pending.map { it.toRemoteDto(ownerId) }
@@ -121,11 +130,25 @@ class CloudSyncService(
         remote.forEach { dto ->
             if (chatDao.getById(dto.id) == null) {
                 chatDao.upsertAll(listOf(dto.toEntity()))
+                if (dto.direction == "Incoming") {
+                    val profile = savedContactDao.getById(dto.peerNodeId)
+                    val senderName = profile?.displayName ?: "Contacto"
+                    chatNotifications?.postDirectMessage(dto.peerNodeId, senderName, dto.content)
+                }
             }
         }
     }
 
     private suspend fun pushChatMessages(ownerId: String) {
+        val deletions = chatDao.getPendingDeletions()
+        val deletedNodeIds = deletions.map { it.nodeId }.distinct()
+        deletedNodeIds.forEach { nodeId ->
+            val result = chatMessageRemote.deleteByNode(nodeId, ownerId)
+            if (result.isSuccess) {
+                chatDao.hardClearByNode(nodeId)
+            }
+        }
+
         val pending = chatDao.getUnsynced()
         if (pending.isEmpty()) return
         val dtos = pending.map { it.toRemoteDto(ownerId) }

@@ -5,6 +5,7 @@ import com.example.airvibe.feature.radar.data.seed.RadarSeedData
 import com.example.airvibe.feature.radar.domain.model.HandshakeRequest
 import com.example.airvibe.feature.radar.domain.model.PersonProfile
 import com.example.airvibe.feature.radar.domain.model.RadarNode
+import com.example.airvibe.feature.radar.domain.model.RadarNodeKind
 import com.example.airvibe.feature.radar.domain.scanner.ScannerError
 import com.example.airvibe.feature.radar.domain.scanner.ScannerState
 
@@ -55,10 +56,12 @@ data class RadarUiState(
     val displayNodes: List<RadarNode>
         get() {
             val ownId = ownProfile?.id
-            return liveNodes
+            val live = liveNodes
                 .filter { ownId == null || it.id != ownId }
                 .filterNot { it.id.startsWith("pending-") }
                 .filterNot { hideDemoNodes && it.id.startsWith(RadarSeedData.SEED_ID_PREFIX) }
+            val groupNodes = nodes.filter { it.kind == RadarNodeKind.Group }
+            return live + groupNodes
         }
 
     val hasNodes: Boolean get() = displayNodes.isNotEmpty()

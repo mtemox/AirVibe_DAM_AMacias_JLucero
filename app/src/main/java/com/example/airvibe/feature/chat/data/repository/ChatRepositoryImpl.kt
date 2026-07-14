@@ -133,7 +133,11 @@ class ChatRepositoryImpl(
     }
 
     override suspend fun clearConversation(peerNodeId: String) {
-        chatDao.clearByNode(peerNodeId)
+        chatDao.softClearByNode(peerNodeId)
+    }
+
+    override suspend fun markConversationAsRead(peerNodeId: String) {
+        chatDao.markConversationAsRead(peerNodeId)
     }
 
     override suspend fun sendRoomMessage(
@@ -143,6 +147,12 @@ class ChatRepositoryImpl(
         val message = roomRepository.insertOutgoingMessage(roomId, text)
         gateway.sendRoomMessage(roomId, message.text, message.id)
         return message
+    }
+
+    override suspend fun sendRoomJoin(roomId: String) {
+        val room = roomRepository.getRoom(roomId) ?: return
+        if (room.isHost) return
+        gateway.sendRoomJoin(room.hostNodeId, room.id, room.title)
     }
 
     /**
@@ -168,7 +178,7 @@ class ChatRepositoryImpl(
             createdAt = createdAt,
             isSynced = false,
         )
-        chatDao.insert(incoming.toEntity())
+        chatDao.insert(incoming.toEntity().copy(isRead = false))
         return incoming
     }
 

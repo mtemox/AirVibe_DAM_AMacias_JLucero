@@ -37,6 +37,7 @@ class GroupRoomViewModel(
     val uiState: StateFlow<GroupRoomUiState> = _uiState.asStateFlow()
 
     init {
+        com.example.airvibe.feature.chat.domain.state.ActiveChatState.setRoomChat(roomId)
         viewModelScope.launch {
             var ready = false
             for (attempt in 0 until 20) {
@@ -56,6 +57,7 @@ class GroupRoomViewModel(
                 return@launch
             }
             roomRepository.joinRoom(roomId)
+            runCatching { chatRepository.sendRoomJoin(roomId) }
             _uiState.update { it.copy(isLoading = false, loadError = null) }
         }
         viewModelScope.launch {
@@ -83,6 +85,11 @@ class GroupRoomViewModel(
                 }
             }
         }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        com.example.airvibe.feature.chat.domain.state.ActiveChatState.setRoomChat(null)
     }
 
     fun sendMessage(text: String) {

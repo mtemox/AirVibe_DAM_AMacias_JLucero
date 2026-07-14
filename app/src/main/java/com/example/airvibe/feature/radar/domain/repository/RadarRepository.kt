@@ -32,6 +32,9 @@ interface RadarRepository {
     /** Indica si el contacto está guardado de forma persistente. */
     suspend fun isSavedContact(nodeId: String): Boolean
 
+    /** Elimina un contacto (soft-delete para sincronización offline). */
+    suspend fun deleteContact(nodeId: String)
+
     /** Lista reactiva de contactos guardados. */
     fun observeFavorites(): Flow<List<PersonProfile>>
 
