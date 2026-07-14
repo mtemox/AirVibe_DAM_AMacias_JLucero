@@ -18,14 +18,18 @@ import com.example.airvibe.feature.chat.data.repository.MatchPreferencesReposito
 import com.example.airvibe.feature.chat.domain.repository.ChatRepository
 import com.example.airvibe.feature.chat.domain.repository.MatchPreferencesRepository
 import com.example.airvibe.feature.chat.domain.scanner.ChatMessageGateway
+import com.example.airvibe.feature.radar.data.device.handshake.HandshakeRequestNotificationManager
 import com.example.airvibe.feature.radar.data.device.identity.DeviceIdentityProvider
 import com.example.airvibe.feature.radar.data.device.nearby.NearbyRadarScanner
 import com.example.airvibe.feature.radar.data.device.service.AirVibeScannerService
+import com.example.airvibe.feature.radar.data.local.dao.HandshakeRequestDao
+import com.example.airvibe.feature.radar.data.local.dao.ProfileViewDao
 import com.example.airvibe.feature.radar.data.local.dao.RadarDao
 import com.example.airvibe.feature.radar.data.local.database.AirVibeDatabase
 import com.example.airvibe.feature.radar.data.remote.SupabaseNodeDataSource
 import com.example.airvibe.feature.radar.data.remote.SupabaseProfileDataSource
 import com.example.airvibe.feature.radar.data.remote.SupabaseSavedContactDataSource
+import com.example.airvibe.feature.radar.data.remote.SupabaseTelemetryDataSource
 import com.example.airvibe.feature.radar.data.sync.CloudSyncService
 import com.example.airvibe.feature.radar.data.repository.RadarRepositoryImpl
 import com.example.airvibe.feature.radar.data.repository.ScannerProfileRepositoryImpl
@@ -77,11 +81,13 @@ object ServiceLocator {
     val savedContactDao by lazy { database.savedContactDao() }
     val chatDao by lazy { database.chatDao() }
     val proximityRoomDao: ProximityRoomDao by lazy { database.proximityRoomDao() }
+    val handshakeRequestDao: HandshakeRequestDao by lazy { database.handshakeRequestDao() }
+    val profileViewDao: ProfileViewDao by lazy { database.profileViewDao() }
 
     val supabaseClient: SupabaseClient by lazy { SupabaseClientFactory.create() }
 
     val radarRepository: RadarRepository by lazy {
-        RadarRepositoryImpl(radarDao, savedContactDao)
+        RadarRepositoryImpl(radarDao, savedContactDao, handshakeRequestDao, profileViewDao)
     }
 
     val authRepository: AuthRepository by lazy {
@@ -121,6 +127,10 @@ object ServiceLocator {
         SupabaseSavedContactDataSource(supabase = supabaseClient)
     }
 
+    val telemetryRemoteDataSource: SupabaseTelemetryDataSource by lazy {
+        SupabaseTelemetryDataSource(supabase = supabaseClient)
+    }
+
     val proximityRoomRemoteDataSource: SupabaseProximityRoomDataSource by lazy {
         SupabaseProximityRoomDataSource(supabase = supabaseClient)
     }
@@ -138,10 +148,12 @@ object ServiceLocator {
             savedContactDao = savedContactDao,
             roomDao = proximityRoomDao,
             chatDao = chatDao,
+            profileViewDao = profileViewDao,
             savedContactRemote = savedContactRemoteDataSource,
             roomRemote = proximityRoomRemoteDataSource,
             roomMessageRemote = roomMessageRemoteDataSource,
             chatMessageRemote = chatMessageRemoteDataSource,
+            telemetryRemote = telemetryRemoteDataSource,
         )
     }
 
@@ -193,12 +205,43 @@ object ServiceLocator {
                     chatGatewayImpl.sendRoomMessage(roomId, text, messageId)
                 override suspend fun sendFriendAdd(targetNodeId: String): Boolean =
                     chatGatewayImpl.sendFriendAdd(targetNodeId)
+                override suspend fun sendHandshakeRequest(
+                    targetNodeId: String,
+                    handshakeId: String,
+                    key: String,
+                ): Boolean = chatGatewayImpl.sendHandshakeRequest(targetNodeId, handshakeId, key)
+                override suspend fun sendHandshakeAccept(
+                    targetNodeId: String,
+                    handshakeId: String,
+                    key: String,
+                ): Boolean = chatGatewayImpl.sendHandshakeAccept(targetNodeId, handshakeId, key)
+                override suspend fun sendHandshakeReject(
+                    targetNodeId: String,
+                    handshakeId: String,
+                ): Boolean = chatGatewayImpl.sendHandshakeReject(targetNodeId, handshakeId)
+                override suspend fun sendRoomJoin(
+                    hostNodeId: String,
+                    roomId: String,
+                    roomTitle: String,
+                ): Boolean = chatGatewayImpl.sendRoomJoin(hostNodeId, roomId, roomTitle)
+                override suspend fun sendRoomLeave(
+                    hostNodeId: String,
+                    roomId: String,
+                ): Boolean = chatGatewayImpl.sendRoomLeave(hostNodeId, roomId)
+                override suspend fun sendRoomAnnounce(
+                    roomId: String,
+                    messageId: String,
+                    text: String,
+                ): Boolean = chatGatewayImpl.sendRoomAnnounce(roomId, messageId, text)
+                override fun roomEndpoints(roomId: String): Set<String> =
+                    chatGatewayImpl.roomEndpoints(roomId)
                 override fun onIncomingPayload(endpointId: String, bytes: ByteArray): Boolean =
                     chatGatewayImpl.onIncomingPayload(endpointId, bytes)
             },
             roomRepository = proximityRoomRepository,
             localUserIdProvider = { scannerProfileProvider().id },
             localDisplayNameProvider = { scannerProfileProvider().displayName },
+            radarRepository = radarRepository,
         )
     }
 
@@ -223,6 +266,7 @@ object ServiceLocator {
                     scanner.ensurePeerNode(nodeId, endpointId)
                 }
             },
+            handshakeNotifications = handshakeRequestNotificationManager,
         )
     }
 
@@ -247,6 +291,13 @@ object ServiceLocator {
             context = appContext!!,
             engine = matchEngine,
         )
+    }
+
+    val handshakeRequestNotificationManager: HandshakeRequestNotificationManager by lazy {
+        requireNotNull(appContext) {
+            "ServiceLocator.init(context) must be called before accessing the handshake manager."
+        }
+        HandshakeRequestNotificationManager(appContext!!)
     }
 
     @Volatile

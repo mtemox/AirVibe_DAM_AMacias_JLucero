@@ -48,4 +48,24 @@ sealed interface RadarUiEvent {
 
     /** Limpia el mensaje de contacto agregado tras mostrar el snackbar. */
     data object ConsumeContactAddedMessage : RadarUiEvent
+
+    // -------- Feature 3: Handshake --------
+
+    /** Envía una solicitud de conexión P2P al peer del nodo. */
+    data class SendHandshakeRequest(val nodeId: String) : RadarUiEvent
+
+    /** Limpia el mensaje informativo tras enviar la solicitud. */
+    data object ConsumeHandshakeSentMessage : RadarUiEvent
+
+    /** Abre el sheet para revisar una solicitud entrante. */
+    data class OpenHandshakeRequest(val handshakeId: String) : RadarUiEvent
+
+    /** Cierra el sheet de la solicitud sin responder. */
+    data object DismissHandshakeRequest : RadarUiEvent
+
+    /** Acepta la solicitud activa (la del sheet). */
+    data class AcceptHandshakeRequest(val handshakeId: String) : RadarUiEvent
+
+    /** Rechaza la solicitud activa. */
+    data class RejectHandshakeRequest(val handshakeId: String) : RadarUiEvent
 }

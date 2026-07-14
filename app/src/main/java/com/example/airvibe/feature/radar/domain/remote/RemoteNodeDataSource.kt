@@ -26,6 +26,10 @@ data class RemoteNode(
     val isFavorite: Boolean,
     val updatedAt: Long,
     val createdAt: Long,
+    val headline: String = "",
+    val bio: String = "",
+    val isPremium: Boolean = false,
+    val premiumCatalog: String? = null,
 )
 
 /**

@@ -50,6 +50,7 @@ fun RadarTopBar(
     modifier: Modifier = Modifier,
     discoveredPeers: Int = 0,
     chatCount: Int = 0,
+    isServiceActive: Boolean = false,
     onSignOut: (() -> Unit)? = null,
     onOpenChats: (() -> Unit)? = null,
     onOpenFriends: (() -> Unit)? = null,
@@ -110,8 +111,13 @@ fun RadarTopBar(
                             style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
                             color = MaterialTheme.colorScheme.onSurface,
                         )
+                        val statusText = when {
+                            isServiceActive -> "Radar en background · escaneando"
+                            isScanning -> "Escaneando entorno"
+                            else -> "Escaneo en pausa"
+                        }
                         Text(
-                            text = if (isScanning) "Escaneando entorno" else "Escaneo en pausa",
+                            text = statusText,
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )

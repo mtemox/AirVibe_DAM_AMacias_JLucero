@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import com.example.airvibe.feature.radar.data.device.identity.DeviceIdentityProvider
 import com.example.airvibe.feature.radar.data.remote.RemoteProfileDto
 import com.example.airvibe.feature.radar.data.remote.SupabaseProfileDataSource
+import com.example.airvibe.feature.radar.domain.model.PresenceStatus
 import com.example.airvibe.feature.radar.domain.model.RadarNodeKind
 import com.example.airvibe.feature.radar.domain.repository.ScannerProfileRepository
 import com.example.airvibe.feature.radar.domain.scanner.ScannerProfile
@@ -49,6 +50,38 @@ class ScannerProfileRepositoryImpl(
         state.value = readProfile()
     }
 
+    override suspend fun updateKind(kind: RadarNodeKind) {
+        prefs.edit().putString(KEY_KIND, kind.name).apply()
+        state.value = readProfile()
+    }
+
+    override suspend fun updatePresence(presence: PresenceStatus) {
+        prefs.edit().putString(KEY_PRESENCE, presence.name).apply()
+        state.value = readProfile()
+    }
+
+    override suspend fun updateHeadline(headline: String) {
+        prefs.edit().putString(KEY_HEADLINE, headline.trim()).apply()
+        state.value = readProfile()
+    }
+
+    override suspend fun updateBio(bio: String) {
+        prefs.edit().putString(KEY_BIO, bio.trim()).apply()
+        state.value = readProfile()
+    }
+
+    override suspend fun updatePremium(isPremium: Boolean, catalog: String?) {
+        prefs.edit()
+            .putBoolean(KEY_IS_PREMIUM, isPremium)
+            .apply()
+        if (catalog != null) {
+            prefs.edit()
+                .putString(KEY_PREMIUM_CATALOG, catalog.trim().take(MAX_CATALOG_BYTES))
+                .apply()
+        }
+        state.value = readProfile()
+    }
+
     override suspend fun applyAuthDisplayName(displayName: String?) {
         if (prefs.getBoolean(KEY_NAME_CUSTOMIZED, false)) return
         val name = displayName?.trim().orEmpty()
@@ -65,6 +98,11 @@ class ScannerProfileRepositoryImpl(
                 id = userId,
                 fullName = profile.displayName,
                 status = profile.status,
+                headline = profile.headline,
+                profession = profile.headline,
+                bio = profile.bio,
+                isPremium = profile.isPremium,
+                premiumCatalog = profile.premiumCatalog,
                 tags = profile.tags,
             ),
         )
@@ -76,6 +114,13 @@ class ScannerProfileRepositoryImpl(
         prefs.edit().apply {
             putString(KEY_DISPLAY_NAME, dto.fullName)
             dto.status?.takeIf { it.isNotBlank() }?.let { putString(KEY_STATUS, it) }
+            if (dto.headline.isNotBlank()) putString(KEY_HEADLINE, dto.headline)
+            dto.profession?.takeIf { it.isNotBlank() && dto.headline.isBlank() }
+                ?.let { putString(KEY_HEADLINE, it) }
+            if (dto.bio.isNotBlank()) putString(KEY_BIO, dto.bio)
+            putBoolean(KEY_IS_PREMIUM, dto.isPremium)
+            dto.premiumCatalog?.takeIf { it.isNotBlank() }
+                ?.let { putString(KEY_PREMIUM_CATALOG, it) }
             if (dto.tags.isNotEmpty()) putString(KEY_TAGS, encodeTags(dto.tags))
             putBoolean(KEY_NAME_CUSTOMIZED, true)
             apply()
@@ -87,7 +132,12 @@ class ScannerProfileRepositoryImpl(
         id = deviceIdentity.deviceId(),
         displayName = prefs.getString(KEY_DISPLAY_NAME, DEFAULT_DISPLAY_NAME) ?: DEFAULT_DISPLAY_NAME,
         status = prefs.getString(KEY_STATUS, DEFAULT_STATUS) ?: DEFAULT_STATUS,
-        kind = RadarNodeKind.Person,
+        kind = prefs.getString(KEY_KIND, null)?.let { decodeKind(it) } ?: RadarNodeKind.Person,
+        presence = prefs.getString(KEY_PRESENCE, null)?.let { decodePresence(it) } ?: PresenceStatus.Online,
+        headline = prefs.getString(KEY_HEADLINE, "").orEmpty(),
+        bio = prefs.getString(KEY_BIO, "").orEmpty(),
+        isPremium = prefs.getBoolean(KEY_IS_PREMIUM, false),
+        premiumCatalog = prefs.getString(KEY_PREMIUM_CATALOG, null)?.takeIf { it.isNotBlank() },
         tags = decodeTags(prefs.getString(KEY_TAGS, null)),
     )
 
@@ -110,13 +160,26 @@ class ScannerProfileRepositoryImpl(
         }.getOrDefault(listOf("AirVibe"))
     }
 
+    private fun decodeKind(raw: String): RadarNodeKind =
+        runCatching { RadarNodeKind.valueOf(raw) }.getOrDefault(RadarNodeKind.Person)
+
+    private fun decodePresence(raw: String): PresenceStatus =
+        runCatching { PresenceStatus.valueOf(raw) }.getOrDefault(PresenceStatus.Online)
+
     companion object {
         private const val PREFS_NAME = "airvibe.scanner_profile"
         private const val KEY_DISPLAY_NAME = "profile.displayName"
         private const val KEY_STATUS = "profile.status"
         private const val KEY_TAGS = "profile.tags"
+        private const val KEY_KIND = "profile.kind"
+        private const val KEY_PRESENCE = "profile.presence"
+        private const val KEY_HEADLINE = "profile.headline"
+        private const val KEY_BIO = "profile.bio"
+        private const val KEY_IS_PREMIUM = "profile.isPremium"
+        private const val KEY_PREMIUM_CATALOG = "profile.premiumCatalog"
         private const val KEY_NAME_CUSTOMIZED = "profile.nameCustomized"
         private const val DEFAULT_DISPLAY_NAME = "Tú"
         private const val DEFAULT_STATUS = "Disponible en el radar"
+        private const val MAX_CATALOG_BYTES = 8 * 1024
     }
 }

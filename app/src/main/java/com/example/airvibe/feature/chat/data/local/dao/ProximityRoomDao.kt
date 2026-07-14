@@ -6,6 +6,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Upsert
 import com.example.airvibe.feature.chat.data.local.entity.ProximityRoomEntity
+import com.example.airvibe.feature.chat.data.local.entity.RoomMemberEntity
 import com.example.airvibe.feature.chat.data.local.entity.RoomMessageEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -50,4 +51,27 @@ interface ProximityRoomDao {
 
     @Query("SELECT EXISTS(SELECT 1 FROM room_messages WHERE id = :id)")
     suspend fun messageExists(id: String): Boolean
+
+    // -------- Feature 4: room members --------
+
+    @Query("SELECT * FROM room_members WHERE room_id = :roomId AND is_active = 1 ORDER BY joined_at ASC")
+    fun observeActiveMembers(roomId: String): Flow<List<RoomMemberEntity>>
+
+    @Query("SELECT * FROM room_members WHERE room_id = :roomId ORDER BY joined_at ASC")
+    fun observeAllMembers(roomId: String): Flow<List<RoomMemberEntity>>
+
+    @Query("SELECT * FROM room_members WHERE room_id = :roomId AND node_id = :nodeId LIMIT 1")
+    suspend fun getMember(roomId: String, nodeId: String): RoomMemberEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertMember(member: RoomMemberEntity): Long
+
+    @Query("UPDATE room_members SET is_active = 0, last_seen_at = :ts WHERE room_id = :roomId AND node_id = :nodeId")
+    suspend fun markMemberInactive(roomId: String, nodeId: String, ts: Long = System.currentTimeMillis())
+
+    @Query("UPDATE room_members SET is_active = 1, last_seen_at = :ts WHERE room_id = :roomId AND node_id = :nodeId")
+    suspend fun markMemberActive(roomId: String, nodeId: String, ts: Long = System.currentTimeMillis())
+
+    @Query("UPDATE room_members SET display_name = :displayName, last_seen_at = :ts WHERE room_id = :roomId AND node_id = :nodeId")
+    suspend fun updateMemberDisplayName(roomId: String, nodeId: String, displayName: String, ts: Long = System.currentTimeMillis())
 }

@@ -2,6 +2,7 @@ package com.example.airvibe.feature.radar.presentation
 
 import com.example.airvibe.feature.chat.domain.model.MatchCriteria
 import com.example.airvibe.feature.radar.data.seed.RadarSeedData
+import com.example.airvibe.feature.radar.domain.model.HandshakeRequest
 import com.example.airvibe.feature.radar.domain.model.PersonProfile
 import com.example.airvibe.feature.radar.domain.model.RadarNode
 import com.example.airvibe.feature.radar.domain.scanner.ScannerError
@@ -15,6 +16,7 @@ import com.example.airvibe.feature.radar.domain.scanner.ScannerState
 data class RadarUiState(
     val isLoading: Boolean = true,
     val isScanning: Boolean = false,
+    val hasAutoStarted: Boolean = false,
     val nodes: List<RadarNode> = emptyList(),
     val selectedNode: RadarNode? = null,
     val selectedProfile: PersonProfile? = null,
@@ -35,6 +37,12 @@ data class RadarUiState(
     val unreadChatCount: Int = 0,
     val hideDemoNodes: Boolean = false,
     val liveNodes: List<RadarNode> = emptyList(),
+    val scannerServiceRunning: Boolean = false,
+    // ---- Feature 3: Handshake ----
+    val incomingHandshakes: List<HandshakeRequest> = emptyList(),
+    val activeHandshake: HandshakeRequest? = null,
+    val isHandshakeSheetVisible: Boolean = false,
+    val handshakeSentMessage: String? = null,
 ) {
     val visibleNodes: List<RadarNode>
         get() = if (hideDemoNodes) {

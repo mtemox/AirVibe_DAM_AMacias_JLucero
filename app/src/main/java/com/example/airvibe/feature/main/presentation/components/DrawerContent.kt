@@ -41,6 +41,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.airvibe.R
 
+import androidx.compose.foundation.layout.systemBarsPadding
+
 @Composable
 fun DrawerContent(
     modifier: Modifier = Modifier,
@@ -56,7 +58,8 @@ fun DrawerContent(
         Column(
             modifier = Modifier
                 .fillMaxHeight()
-                .padding(vertical = 24.dp)
+                .systemBarsPadding()
+                .padding(bottom = 24.dp, top = 8.dp)
         ) {
             // Header Profile
             Row(

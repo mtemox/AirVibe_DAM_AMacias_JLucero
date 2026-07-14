@@ -2,9 +2,11 @@ package com.example.airvibe.feature.chat.data.repository
 
 import com.example.airvibe.feature.chat.data.local.dao.ProximityRoomDao
 import com.example.airvibe.feature.chat.data.local.entity.ProximityRoomEntity
+import com.example.airvibe.feature.chat.data.local.entity.RoomMemberEntity
 import com.example.airvibe.feature.chat.data.local.entity.RoomMessageEntity
 import com.example.airvibe.feature.chat.data.mapper.RoomMapper.toDomain
 import com.example.airvibe.feature.chat.domain.model.ProximityRoom
+import com.example.airvibe.feature.chat.domain.model.RoomMember
 import com.example.airvibe.feature.chat.domain.model.RoomMessage
 import com.example.airvibe.feature.chat.domain.repository.ProximityRoomRepository
 import java.util.UUID
@@ -76,8 +78,76 @@ class ProximityRoomRepositoryImpl(
 
     override suspend fun joinRoom(roomId: String) {
         roomDao.markJoined(roomId)
+        val localId = localUserIdProvider()
+        val localName = localDisplayNameProvider()
+        roomDao.upsertMember(
+            RoomMemberEntity(
+                roomId = roomId,
+                nodeId = localId,
+                displayName = localName,
+                role = RoomMemberEntity.ROLE_GUEST,
+                isActive = true,
+            ),
+        )
         notifyChanged()
     }
+
+    override suspend fun registerLocalGuest(roomId: String) {
+        val localId = localUserIdProvider()
+        val localName = localDisplayNameProvider()
+        roomDao.upsertMember(
+            RoomMemberEntity(
+                roomId = roomId,
+                nodeId = localId,
+                displayName = localName,
+                role = RoomMemberEntity.ROLE_GUEST,
+                isActive = true,
+            ),
+        )
+        notifyChanged()
+    }
+
+    override suspend fun registerGuest(
+        roomId: String,
+        nodeId: String,
+        displayName: String,
+        role: String,
+    ) {
+        roomDao.upsertMember(
+            RoomMemberEntity(
+                roomId = roomId,
+                nodeId = nodeId,
+                displayName = displayName,
+                role = role,
+                isActive = true,
+            ),
+        )
+        notifyChanged()
+    }
+
+    override suspend fun markMemberLeft(roomId: String, nodeId: String) {
+        roomDao.markMemberInactive(roomId, nodeId)
+        notifyChanged()
+    }
+
+    override suspend fun refreshMemberPresence(
+        roomId: String,
+        nodeId: String,
+        displayName: String?,
+    ) {
+        if (displayName != null) {
+            roomDao.updateMemberDisplayName(roomId, nodeId, displayName)
+        } else {
+            roomDao.markMemberActive(roomId, nodeId)
+        }
+        notifyChanged()
+    }
+
+    override fun observeActiveMembers(roomId: String): Flow<List<RoomMember>> =
+        roomDao.observeActiveMembers(roomId).map { rows -> rows.map { it.toDomain() } }
+
+    override fun observeAllMembers(roomId: String): Flow<List<RoomMember>> =
+        roomDao.observeAllMembers(roomId).map { rows -> rows.map { it.toDomain() } }
 
     override suspend fun insertOutgoingMessage(roomId: String, text: String): RoomMessage {
         val trimmed = text.trim()

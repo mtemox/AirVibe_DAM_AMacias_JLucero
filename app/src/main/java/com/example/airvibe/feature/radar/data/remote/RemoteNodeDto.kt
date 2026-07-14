@@ -27,6 +27,10 @@ internal data class RemoteNodeDto(
     @SerialName("signal_strength") val signalStrength: Double,
     @SerialName("accent_color_argb") val accentColorArgb: Long,
     @SerialName("tags") val tags: List<String> = emptyList(),
+    @SerialName("headline") val headline: String = "",
+    @SerialName("bio") val bio: String = "",
+    @SerialName("is_premium") val isPremium: Boolean = false,
+    @SerialName("premium_catalog") val premiumCatalog: String? = null,
     @SerialName("is_favorite") val isFavorite: Boolean = false,
     @SerialName("updated_at") val updatedAt: String? = null,
     @SerialName("created_at") val createdAt: String? = null,
@@ -45,6 +49,10 @@ internal fun NodeEntity.toRemoteDto(ownerId: String): RemoteNodeDto = RemoteNode
     signalStrength = signalStrength.toDouble(),
     accentColorArgb = accentColorArgb.toLong() and 0xFFFFFFFFL,
     tags = tags,
+    headline = headline,
+    bio = bio,
+    isPremium = isPremium,
+    premiumCatalog = premiumCatalog,
     isFavorite = isFavorite,
 )
 
@@ -63,6 +71,10 @@ internal fun RemoteNodeDto.toDomain(): RemoteNode = RemoteNode(
     isFavorite = isFavorite,
     updatedAt = updatedAt?.toEpochMillis() ?: System.currentTimeMillis(),
     createdAt = createdAt?.toEpochMillis() ?: System.currentTimeMillis(),
+    headline = headline,
+    bio = bio,
+    isPremium = isPremium,
+    premiumCatalog = premiumCatalog,
 )
 
 internal fun RemoteNodeDto.toEntity(): NodeEntity = NodeEntity(
@@ -77,6 +89,10 @@ internal fun RemoteNodeDto.toEntity(): NodeEntity = NodeEntity(
     signalStrength = signalStrength.toFloat(),
     accentColorArgb = accentColorArgb.toInt(),
     tags = tags,
+    headline = headline,
+    bio = bio,
+    isPremium = isPremium,
+    premiumCatalog = premiumCatalog,
     isFavorite = isFavorite,
     isSynced = true,
     updatedAt = updatedAt?.toEpochMillis() ?: System.currentTimeMillis(),

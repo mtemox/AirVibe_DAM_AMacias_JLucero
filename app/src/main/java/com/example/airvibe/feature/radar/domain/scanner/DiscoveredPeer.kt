@@ -32,15 +32,17 @@ data class DiscoveredPeer(
         id = profile.id,
         displayName = profile.displayName,
         status = profile.status,
-        detail = buildString {
-            append(profile.status)
-            if (profile.tags.isNotEmpty()) {
-                append(" · ")
-                append(profile.tags.joinToString(" · "))
+        detail = profile.bio.ifBlank {
+            buildString {
+                append(profile.status)
+                if (profile.tags.isNotEmpty()) {
+                    append(" · ")
+                    append(profile.tags.joinToString(" · "))
+                }
             }
         },
         kind = profile.kind,
-        presence = com.example.airvibe.feature.radar.domain.model.PresenceStatus.Online,
+        presence = profile.presence,
         angleDegrees = (profile.id.hashCode().toLong() and 0xFFFFFFFFL)
             .let { ((it % 360).toInt()).toFloat() }
             .coerceIn(0f, 359.9f),
@@ -48,6 +50,10 @@ data class DiscoveredPeer(
         signalStrength = signalStrength,
         accentColor = accentColor,
         tags = profile.tags,
+        headline = profile.headline,
+        bio = profile.bio,
+        isPremium = profile.isPremium,
+        premiumCatalog = profile.premiumCatalog,
     )
 
     companion object {

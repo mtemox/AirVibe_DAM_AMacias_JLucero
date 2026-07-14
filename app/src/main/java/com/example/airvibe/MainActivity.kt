@@ -55,6 +55,10 @@ class MainActivity : ComponentActivity() {
     private fun parseDeepLink(intent: Intent?): AppDeepLink? {
         val roomId = intent?.getStringExtra(EXTRA_OPEN_ROOM_ID)
         if (!roomId.isNullOrBlank()) return AppDeepLink.Room(roomId)
+        val handshakeId = intent?.getStringExtra(EXTRA_OPEN_HANDSHAKE_REQUEST)
+        if (!handshakeId.isNullOrBlank()) {
+            return AppDeepLink.Handshake(handshakeId)
+        }
         val nodeId = intent?.getStringExtra(EXTRA_OPEN_CHAT_WITH_NODE_ID)
         val fromMatch = intent?.getBooleanExtra(EXTRA_OPEN_CHAT_FROM_MATCH, false) == true
         if (fromMatch && !nodeId.isNullOrBlank()) return AppDeepLink.Chat(nodeId, fromMatch = true)
@@ -65,12 +69,14 @@ class MainActivity : ComponentActivity() {
         const val EXTRA_OPEN_CHAT_WITH_NODE_ID = "airvibe.extra.OPEN_CHAT_WITH_NODE_ID"
         const val EXTRA_OPEN_CHAT_FROM_MATCH = "airvibe.extra.OPEN_CHAT_FROM_MATCH"
         const val EXTRA_OPEN_ROOM_ID = "airvibe.extra.OPEN_ROOM_ID"
+        const val EXTRA_OPEN_HANDSHAKE_REQUEST = "airvibe.extra.OPEN_HANDSHAKE_REQUEST"
     }
 }
 
 private sealed interface AppDeepLink {
     data class Room(val roomId: String) : AppDeepLink
     data class Chat(val nodeId: String, val fromMatch: Boolean = false) : AppDeepLink
+    data class Handshake(val handshakeId: String) : AppDeepLink
 }
 
 @Composable
@@ -85,6 +91,11 @@ private fun AirVibeApp(
             when (initialDeepLink) {
                 is AppDeepLink.Room -> ChatTarget.ActiveRoom(initialDeepLink.roomId)
                 is AppDeepLink.Chat -> ChatTarget.ActiveChat(initialDeepLink.nodeId)
+                // Para un deep-link de Handshake, mostramos la pantalla
+                // principal (radar). El sheet se abrirá automáticamente
+                // porque [RadarViewModel] observa las solicitudes
+                // pendientes en Room.
+                is AppDeepLink.Handshake -> ChatTarget.Closed
                 null -> ChatTarget.Closed
             },
         )
@@ -103,6 +114,16 @@ private fun AirVibeApp(
             is AppDeepLink.Chat -> {
                 chatTarget = ChatTarget.ActiveChat(initialDeepLink.nodeId)
                 fromMatchNavigation = initialDeepLink.fromMatch
+                onDeepLinkHandled()
+            }
+            is AppDeepLink.Handshake -> {
+                // Al volver del deep-link, mantenemos la MainScreen
+                // abierta. El sheet se auto-abrirá vía el observer de
+                // [RadarViewModel] cuando la solicitud siga en
+                // estado Pending. Para abrirlo de inmediato,
+                // disparamos un intent que el ServiceLocator ya
+                // materializa como deep-link en el sheet.
+                chatTarget = ChatTarget.Closed
                 onDeepLinkHandled()
             }
             null -> Unit

@@ -50,6 +50,8 @@ class RadarViewModel(
         observeMatchPreferences()
         observeUnreadChats()
         observeOwnProfile()
+        observeScannerService()
+        observeIncomingHandshakes()
         syncAuthDisplayName()
     }
 
@@ -81,6 +83,33 @@ class RadarViewModel(
             scanner.liveNodes
                 .onEach { live ->
                     _uiState.update { it.copy(liveNodes = live) }
+                }
+                .collect()
+        }
+        // Feature 5: cada vez que cambia el set de nodos en
+        // vivo, registramos un evento de "View" por cada peer
+        // (no-self, no-seed, no-pending). El SyncWorker se
+        // encargará de empujar el buffer a Supabase.
+        viewModelScope.launch {
+            var lastSeen: Set<String> = emptySet()
+            scanner.liveNodes
+                .onEach { live ->
+                    val current = live
+                        .filter { !it.id.startsWith("pending-") && !it.id.startsWith(RadarSeedData.SEED_ID_PREFIX) }
+                        .map { it.id }
+                        .toSet()
+                    val localNodeId = profileRepository.current().id
+                    val newOnes = current - lastSeen
+                    newOnes.forEach { nodeId ->
+                        if (nodeId != localNodeId) {
+                            repository.recordProfileEvent(
+                                targetUserId = nodeId,
+                                sourceNodeId = localNodeId,
+                                kind = com.example.airvibe.feature.radar.data.local.entity.ProfileViewEntity.KIND_VIEW,
+                            )
+                        }
+                    }
+                    lastSeen = current
                 }
                 .collect()
         }
@@ -119,6 +148,35 @@ class RadarViewModel(
                                 else -> it.pendingPermissionRequest
                             },
                             errorMessage = scanErrorMessage ?: if (isScanning) null else it.errorMessage,
+                        )
+                    }
+                }
+                .collect()
+        }
+    }
+
+    private fun observeScannerService() {
+        viewModelScope.launch {
+            com.example.airvibe.feature.radar.data.device.service.ScannerServiceState.isRunning
+                .onEach { running ->
+                    _uiState.update { it.copy(scannerServiceRunning = running) }
+                }
+                .collect()
+        }
+    }
+
+    private fun observeIncomingHandshakes() {
+        viewModelScope.launch {
+            repository.observeIncomingHandshakes()
+                .onEach { requests ->
+                    val current = _uiState.value
+                    val nextActive = current.activeHandshake
+                        ?.takeIf { active -> requests.any { it.handshakeId == active.handshakeId } }
+                        ?: requests.firstOrNull()
+                    _uiState.update {
+                        it.copy(
+                            incomingHandshakes = requests,
+                            activeHandshake = nextActive,
                         )
                     }
                 }
@@ -194,6 +252,16 @@ class RadarViewModel(
             RadarUiEvent.ConsumeContactAddedMessage -> _uiState.update {
                 it.copy(contactAddedMessage = null)
             }
+            is RadarUiEvent.SendHandshakeRequest -> sendHandshakeRequest(event.nodeId)
+            RadarUiEvent.ConsumeHandshakeSentMessage -> _uiState.update {
+                it.copy(handshakeSentMessage = null)
+            }
+            is RadarUiEvent.OpenHandshakeRequest -> openHandshake(event.handshakeId)
+            RadarUiEvent.DismissHandshakeRequest -> _uiState.update {
+                it.copy(isHandshakeSheetVisible = false)
+            }
+            is RadarUiEvent.AcceptHandshakeRequest -> respondToHandshake(event.handshakeId, accept = true)
+            is RadarUiEvent.RejectHandshakeRequest -> respondToHandshake(event.handshakeId, accept = false)
         }
     }
 
@@ -203,6 +271,18 @@ class RadarViewModel(
         val node = _uiState.value.displayNodes.firstOrNull { it.id == nodeId }
             ?: _uiState.value.nodes.firstOrNull { it.id == nodeId }
             ?: return
+        // Feature 5: registrar un "Tap" para el dashboard de
+        // visibilidad del peer.
+        viewModelScope.launch {
+            val localNodeId = profileRepository.current().id
+            if (nodeId != localNodeId) {
+                repository.recordProfileEvent(
+                    targetUserId = nodeId,
+                    sourceNodeId = localNodeId,
+                    kind = com.example.airvibe.feature.radar.data.local.entity.ProfileViewEntity.KIND_TAP,
+                )
+            }
+        }
         viewModelScope.launch {
             val profile = repository.getProfile(nodeId)
                 ?: PersonProfile.fromNode(node, distanceMeters = proximityMeters(node.distanceNormalized))
@@ -236,6 +316,7 @@ class RadarViewModel(
 
     private fun startScanning() {
         viewModelScope.launch {
+            _uiState.update { it.copy(hasAutoStarted = true) }
             runCatching {
                 scannerLifecycle.execute(ScannerLifecycle.Action.Start)
             }.onFailure {
@@ -301,9 +382,24 @@ class RadarViewModel(
         viewModelScope.launch { scanner.updateProfile(profile) }
     }
 
-    private fun saveOwnProfile(displayName: String, status: String, tags: List<String>) {
+    private fun saveOwnProfile(
+        displayName: String,
+        status: String,
+        tags: List<String>,
+        kind: com.example.airvibe.feature.radar.domain.model.RadarNodeKind,
+        presence: com.example.airvibe.feature.radar.domain.model.PresenceStatus,
+        headline: String,
+        bio: String,
+        isPremium: Boolean,
+        premiumCatalog: String?,
+    ) {
         viewModelScope.launch {
             profileRepository.update(displayName, status, tags)
+            profileRepository.updateKind(kind)
+            profileRepository.updatePresence(presence)
+            profileRepository.updateHeadline(headline)
+            profileRepository.updateBio(bio)
+            profileRepository.updatePremium(isPremium, premiumCatalog)
             val updated = profileRepository.current()
             runCatching { scanner.updateProfile(updated) }
             runCatching { profileRepository.syncToRemote(updated) }
@@ -317,6 +413,16 @@ class RadarViewModel(
             _uiState.update { it.copy(isBroadcasting = true) }
             val result = runCatching { chatRepository.broadcast(text) }
                 .getOrElse { com.example.airvibe.feature.chat.domain.repository.BroadcastResult(0, "") }
+            // Feature 5: registrar un evento Broadcast. La
+            // telemetría se envía al SyncWorker en background.
+            val localNodeId = profileRepository.current().id
+            if (result.roomId.isNotBlank()) {
+                repository.recordProfileEvent(
+                    targetUserId = result.roomId,
+                    sourceNodeId = localNodeId,
+                    kind = com.example.airvibe.feature.radar.data.local.entity.ProfileViewEntity.KIND_BROADCAST,
+                )
+            }
             _uiState.update {
                 it.copy(
                     isBroadcasting = false,
@@ -327,8 +433,18 @@ class RadarViewModel(
         }
     }
 
-    fun onOwnProfileSave(displayName: String, status: String, tags: List<String>) {
-        saveOwnProfile(displayName, status, tags)
+    fun onOwnProfileSave(
+        displayName: String,
+        status: String,
+        tags: List<String>,
+        kind: com.example.airvibe.feature.radar.domain.model.RadarNodeKind,
+        presence: com.example.airvibe.feature.radar.domain.model.PresenceStatus,
+        headline: String,
+        bio: String,
+        isPremium: Boolean,
+        premiumCatalog: String?,
+    ) {
+        saveOwnProfile(displayName, status, tags, kind, presence, headline, bio, isPremium, premiumCatalog)
     }
 
     private fun signOut() {
@@ -344,6 +460,107 @@ class RadarViewModel(
                 _uiState.update {
                     it.copy(errorMessage = error.message ?: "No se pudo cerrar sesión")
                 }
+            }
+        }
+    }
+
+    // -------- Feature 3: Handshake --------
+
+    /**
+     * Envía una solicitud de handshake al peer correspondiente.
+     * Persiste una copia local (dirección `Outgoing`) y dispara
+     * un mensaje al peer para que reciba la notificación nativa.
+     */
+    private fun sendHandshakeRequest(nodeId: String) {
+        if (nodeId.isBlank() || nodeId.startsWith("pending-") ||
+            nodeId.startsWith(com.example.airvibe.feature.radar.data.seed.RadarSeedData.SEED_ID_PREFIX)
+        ) return
+        val profile = _uiState.value.ownProfile ?: return
+        val handshakeId = java.util.UUID.randomUUID().toString()
+        val key = (profile.id + ":" + handshakeId).take(64)
+        viewModelScope.launch {
+            val direction = com.example.airvibe.feature.radar.domain.model.HandshakeRequest.Direction.Outgoing
+            val request = com.example.airvibe.feature.radar.domain.model.HandshakeRequest(
+                id = 0L,
+                handshakeId = handshakeId,
+                peerNodeId = nodeId,
+                peerDisplayName = "",
+                peerHeadline = "",
+                peerStatus = "",
+                peerPresence = com.example.airvibe.feature.radar.domain.model.PresenceStatus.Online,
+                peerTags = emptyList(),
+                handshakeKey = key,
+                direction = direction,
+                status = com.example.airvibe.feature.radar.domain.model.HandshakeRequest.Status.Pending,
+                createdAt = System.currentTimeMillis(),
+                respondedAt = null,
+            )
+            repository.upsertHandshakeRequest(request)
+            val sent = runCatching {
+                chatGateway.sendHandshakeRequest(
+                    targetNodeId = nodeId,
+                    handshakeId = handshakeId,
+                    key = key,
+                )
+            }.getOrDefault(false)
+            _uiState.update {
+                it.copy(
+                    handshakeSentMessage = if (sent) {
+                        "Solicitud enviada a ${it.nodes.firstOrNull { n -> n.id == nodeId }?.displayName ?: "el peer"}"
+                    } else {
+                        "No se pudo enviar la solicitud (peer sin conexión)."
+                    },
+                )
+            }
+        }
+    }
+
+    private fun openHandshake(handshakeId: String) {
+        viewModelScope.launch {
+            val request = repository.getHandshakeById(handshakeId) ?: return@launch
+            _uiState.update {
+                it.copy(
+                    activeHandshake = request,
+                    isHandshakeSheetVisible = true,
+                )
+            }
+        }
+    }
+
+    private fun respondToHandshake(handshakeId: String, accept: Boolean) {
+        viewModelScope.launch {
+            val result = repository.respondToHandshake(handshakeId, accept = accept)
+            if (result != null) {
+                runCatching {
+                    if (accept) {
+                        chatGateway.sendHandshakeAccept(
+                            targetNodeId = result.peerNodeId,
+                            handshakeId = result.handshakeId,
+                            key = result.handshakeKey,
+                        )
+                    } else {
+                        chatGateway.sendHandshakeReject(
+                            targetNodeId = result.peerNodeId,
+                            handshakeId = result.handshakeId,
+                        )
+                    }
+                }
+                ServiceLocator.requestContactsSync()
+            }
+            _uiState.update { state ->
+                val remaining = state.incomingHandshakes.filterNot { it.handshakeId == handshakeId }
+                state.copy(
+                    incomingHandshakes = remaining,
+                    activeHandshake = state.activeHandshake?.takeIf { it.handshakeId != handshakeId }
+                        ?: remaining.firstOrNull(),
+                    isHandshakeSheetVisible = state.activeHandshake?.takeIf { it.handshakeId != handshakeId }
+                        ?.let { true } ?: false,
+                    contactAddedMessage = if (accept && result != null) {
+                        "Conectado con ${result.peerDisplayName}"
+                    } else {
+                        state.contactAddedMessage
+                    },
+                )
             }
         }
     }

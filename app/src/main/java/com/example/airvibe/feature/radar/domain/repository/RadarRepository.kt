@@ -1,5 +1,6 @@
 package com.example.airvibe.feature.radar.domain.repository
 
+import com.example.airvibe.feature.radar.domain.model.HandshakeRequest
 import com.example.airvibe.feature.radar.domain.model.PersonProfile
 import com.example.airvibe.feature.radar.domain.model.RadarNode
 import kotlinx.coroutines.flow.Flow
@@ -59,4 +60,59 @@ interface RadarRepository {
 
     /** Elimina nodos placeholder creados durante la conexión inicial. */
     suspend fun removePendingNodes()
+
+    // ---- Feature 3: Handshake (Conexión y Networking P2P) ----
+
+    /** Flujo reactivo de solicitudes entrantes pendientes. */
+    fun observeIncomingHandshakes(): Flow<List<HandshakeRequest>>
+
+    /** Snapshot de una solicitud por su `handshakeId`. */
+    suspend fun getHandshakeById(handshakeId: String): HandshakeRequest?
+
+    /**
+     * Persiste o actualiza una solicitud de handshake. Si la fila
+     * ya existe (mismo `handshakeId`), sólo se refresca la
+     * información de perfil — el estado se respeta para no
+     * "des-aceptar" una conexión ya materializada.
+     */
+    suspend fun upsertHandshakeRequest(request: HandshakeRequest)
+
+    /**
+     * Marca la solicitud como `Accepted` o `Rejected` y
+     * opcionalmente guarda el contacto (cuando [accept] es
+     * `true`). Devuelve el [PersonProfile] resultante en caso
+     * de aceptación para que el caller pueda navegar al chat.
+     */
+    suspend fun respondToHandshake(
+        handshakeId: String,
+        accept: Boolean,
+    ): HandshakeRequest?
+
+    // ---- Feature 5: Telemetría y Visibilidad Premium ----
+
+    /** Registra un evento de telemetría (View / Tap / Broadcast). */
+    suspend fun recordProfileEvent(
+        targetUserId: String,
+        sourceNodeId: String,
+        kind: String = com.example.airvibe.feature.radar.data.local.entity.ProfileViewEntity.KIND_VIEW,
+    )
+
+    /** Limpia el buffer de telemetría pendiente y la sube a Supabase. */
+    suspend fun flushTelemetry(limit: Int = 200): Int
+
+    /** Marca los ids como sincronizados. Llamado por el [SyncWorker]. */
+    suspend fun markTelemetrySynced(ids: List<Long>)
+
+    /** Conteo de eventos aún sin sincronizar. */
+    fun observePendingTelemetryCount(): kotlinx.coroutines.flow.Flow<Int>
+
+    /**
+     * Suma local de vistas / taps en los últimos N días.
+     * Se combina con `pullVisibility` para alimentar el dashboard
+     * Premium offline-first.
+     */
+    suspend fun localVisibility(): com.example.airvibe.feature.radar.domain.model.VisibilityStats
+
+    /** Limpia entradas sincronizadas más viejas que [olderThan]. */
+    suspend fun pruneSyncedTelemetry(olderThan: Long)
 }

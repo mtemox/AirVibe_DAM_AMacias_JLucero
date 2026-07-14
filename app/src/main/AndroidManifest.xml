@@ -147,6 +147,16 @@
             android:foregroundServiceType="connectedDevice" />
 
         <!--
+            BroadcastReceiver que procesa las acciones de la
+            notificación de Handshake (Aceptar / Rechazar) aunque
+            la app esté en background. No es exportado: sólo el
+            sistema y la propia app lo invocan.
+        -->
+        <receiver
+            android:name=".feature.radar.data.device.handshake.HandshakeActionReceiver"
+            android:exported="false" />
+
+        <!--
             Queries para que Android 11+ pueda descubrir la
             aplicación Nearby Connections de Google Play Services
             (que es un servicio del sistema, no de otra app).

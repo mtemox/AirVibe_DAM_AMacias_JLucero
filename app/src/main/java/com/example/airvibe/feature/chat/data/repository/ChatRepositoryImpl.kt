@@ -12,6 +12,7 @@ import com.example.airvibe.feature.chat.domain.repository.ChatRepository
 import com.example.airvibe.feature.chat.domain.repository.ConversationSummary
 import com.example.airvibe.feature.chat.domain.repository.ProximityRoomRepository
 import com.example.airvibe.feature.chat.domain.scanner.ChatMessageGateway
+import com.example.airvibe.feature.radar.domain.repository.RadarRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -41,6 +42,7 @@ class ChatRepositoryImpl(
     private val roomRepository: ProximityRoomRepository,
     private val localUserIdProvider: () -> String,
     private val localDisplayNameProvider: () -> String,
+    private val radarRepository: RadarRepository? = null,
 ) : ChatRepository {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -98,6 +100,30 @@ class ChatRepositoryImpl(
             hostNodeId = hostId,
             hostName = hostName,
         )
+        // Feature 4: registrar la sala como un nodo `Group` en el
+        // radar. El id es determinista (`room:<roomId>`) para que
+        // el `RadarIntentToken` la pinte con el icono `Groups`
+        // y el color violeta de las salas.
+        try {
+            val roomNode = com.example.airvibe.feature.radar.domain.model.RadarNode(
+                id = "room:${room.id}",
+                displayName = room.title,
+                status = "Anfitrión: $hostName",
+                detail = "Sala de proximidad — ${room.title}",
+                kind = com.example.airvibe.feature.radar.domain.model.RadarNodeKind.Group,
+                presence = com.example.airvibe.feature.radar.domain.model.PresenceStatus.Online,
+                angleDegrees = (room.id.hashCode().toLong() and 0xFFFFFFFFL)
+                    .let { ((it % 360).toInt()).toFloat() }
+                    .coerceIn(0f, 359.9f),
+                distanceNormalized = 0.18f,
+                signalStrength = 0.95f,
+                accentColor = androidx.compose.ui.graphics.Color(0xFF8B5CF6),
+                tags = listOf("Sala", room.id),
+            )
+            radarRepository?.upsertNode(roomNode)
+        } catch (_: Throwable) {
+            // No bloquear el broadcast si la creación del nodo falla.
+        }
         val count = try {
             gateway.broadcastRoomInvite(trimmed, room.id)
         } catch (_: Throwable) {

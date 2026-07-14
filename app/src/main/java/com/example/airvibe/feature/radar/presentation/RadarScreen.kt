@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Radar
+import androidx.compose.material.icons.rounded.PersonAddAlt
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -50,6 +51,7 @@ import com.example.airvibe.core.permissions.rememberRadarPermissionsState
 import com.example.airvibe.feature.chat.presentation.components.MatchPreferencesSheet
 import com.example.airvibe.feature.radar.domain.model.RadarNode
 import com.example.airvibe.feature.radar.presentation.components.BroadcastSheet
+import com.example.airvibe.feature.radar.presentation.components.HandshakeRequestSheet
 import com.example.airvibe.feature.radar.presentation.components.OwnProfileSheet
 import com.example.airvibe.feature.radar.presentation.components.ProfilePreviewContent
 import com.example.airvibe.feature.radar.presentation.components.RadarControlPanel
@@ -59,8 +61,7 @@ import com.example.airvibe.feature.radar.presentation.components.RadarMapBackgro
 import com.example.airvibe.feature.radar.presentation.components.RadarNodeBubble
 import com.example.airvibe.feature.radar.presentation.components.RadarSweep
 import com.example.airvibe.feature.radar.presentation.components.RadarTopBar
-import com.example.airvibe.feature.radar.presentation.components.permissions.PermissionsModal
-
+import com.example.airvibe.feature.radar.presentation.components.permissions.PermissionsScreen
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RadarScreen(
@@ -98,6 +99,12 @@ fun RadarScreen(
         state.pendingPermissionRequest && !permissionsState.allGranted
     }
 
+    LaunchedEffect(permissionsState.allGranted) {
+        if (permissionsState.allGranted && !state.isScanning && !state.hasAutoStarted) {
+            viewModel.onEvent(RadarUiEvent.StartScanning)
+        }
+    }
+
     val currentUser by ServiceLocator.authRepository.currentUser.collectAsStateWithLifecycle()
     val displayName = state.ownProfile?.displayName?.takeIf { it.isNotBlank() }
         ?: currentUser?.displayName?.takeIf { it.isNotBlank() }
@@ -118,6 +125,7 @@ fun RadarScreen(
                 isScanning = state.isScanning,
                 discoveredPeers = state.discoveredPeers,
                 chatCount = state.unreadChatCount,
+                isServiceActive = state.scannerServiceRunning,
                 onSignOut = { viewModel.onEvent(RadarUiEvent.SignOut) },
                 onOpenChats = onOpenChats,
                 onOpenFriends = onOpenFriends,
@@ -168,13 +176,38 @@ fun RadarScreen(
                 .navigationBarsPadding()
                 .padding(bottom = 8.dp),
         )
+
+        // -------- Feature 3: banner de solicitud entrante (nuevo) --------
+        // Bloque adicional al final del Box raíz; NO modifica los
+        // componentes existentes. Solo se renderiza si hay handshakes
+        // pendientes y el sheet no está abierto.
+        if (state.incomingHandshakes.isNotEmpty() && !state.isHandshakeSheetVisible) {
+            HandshakeIncomingBanner(
+                count = state.incomingHandshakes.size,
+                displayName = state.incomingHandshakes.first().peerDisplayName
+                    .ifBlank { "Usuario cercano" },
+                onView = {
+                    viewModel.onEvent(
+                        RadarUiEvent.OpenHandshakeRequest(
+                            state.incomingHandshakes.first().handshakeId,
+                        ),
+                    )
+                },
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 12.dp, start = 16.dp, end = 16.dp)
+                    .fillMaxWidth(),
+            )
+        }
     }
 
-    PermissionsModal(
-        state = permissionsState,
-        visible = shouldShowPermissions,
-        onDismiss = { viewModel.onEvent(RadarUiEvent.DismissPermissions) },
-    )
+    if (shouldShowPermissions) {
+        PermissionsScreen(
+            state = permissionsState,
+            onDismiss = { viewModel.onEvent(RadarUiEvent.DismissPermissions) },
+            onMenuClick = {}
+        )
+    }
 
     val profile = state.selectedProfile
     val node = state.selectedNode
@@ -199,6 +232,9 @@ fun RadarScreen(
                     onConnect = { onOpenChat(node.id) },
                     onAddContact = { viewModel.onEvent(RadarUiEvent.AddToContacts) },
                     onToggleFavorite = { viewModel.onEvent(RadarUiEvent.ToggleFavorite) },
+                    onSendHandshake = {
+                        viewModel.onEvent(RadarUiEvent.SendHandshakeRequest(node.id))
+                    },
                     modifier = Modifier
                         .padding(top = 24.dp)
                         .clip(sheetShape)
@@ -216,10 +252,63 @@ fun RadarScreen(
                         )
                         .glassBlur(radius = 28.dp, shape = sheetShape)
                         .fillMaxWidth(),
-                )
-            }
+            )
         }
     }
+
+    // -------- Feature 3: Handshake (sin tocar UI existente) --------
+
+    LaunchedEffect(state.handshakeSentMessage) {
+        state.handshakeSentMessage?.let { message ->
+            snackbarHostState.showSnackbar(message)
+            viewModel.onEvent(RadarUiEvent.ConsumeHandshakeSentMessage)
+        }
+    }
+
+    val activeHandshake = state.activeHandshake
+    if (state.isHandshakeSheetVisible && activeHandshake != null) {
+        ModalBottomSheet(
+            onDismissRequest = { viewModel.onEvent(RadarUiEvent.DismissHandshakeRequest) },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = Color.Transparent,
+            scrimColor = Color.Black.copy(alpha = 0.45f),
+            dragHandle = null,
+        ) {
+            val sheetShape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)
+            HandshakeRequestSheet(
+                request = activeHandshake,
+                onAccept = {
+                    viewModel.onEvent(
+                        RadarUiEvent.AcceptHandshakeRequest(activeHandshake.handshakeId),
+                    )
+                },
+                onReject = {
+                    viewModel.onEvent(
+                        RadarUiEvent.RejectHandshakeRequest(activeHandshake.handshakeId),
+                    )
+                },
+                onDismiss = { viewModel.onEvent(RadarUiEvent.DismissHandshakeRequest) },
+                modifier = Modifier
+                    .padding(top = 24.dp)
+                    .clip(sheetShape)
+                    .background(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                AirVibeTheme.glass.surfaceFillStrong,
+                                MaterialTheme.colorScheme.surface,
+                            ),
+                        ),
+                    )
+                    .glassShadow(
+                        color = AirVibeTheme.glass.shadowColor,
+                        cornerRadius = 0.dp,
+                    )
+                    .glassBlur(radius = 28.dp, shape = sheetShape)
+                    .fillMaxWidth(),
+            )
+        }
+    }
+}
 
     // Sheet de filtros de matching
     if (state.isMatchFiltersVisible) {
@@ -265,8 +354,18 @@ fun RadarScreen(
             val sheetShape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)
             OwnProfileSheet(
                 profile = state.ownProfile!!,
-                onSave = { name, status, tags ->
-                    viewModel.onOwnProfileSave(name, status, tags)
+                onSave = { draft ->
+                    viewModel.onOwnProfileSave(
+                        displayName = draft.displayName,
+                        status = draft.status,
+                        tags = draft.tags,
+                        kind = draft.kind,
+                        presence = draft.presence,
+                        headline = draft.headline,
+                        bio = draft.bio,
+                        isPremium = draft.isPremium,
+                        premiumCatalog = draft.premiumCatalog,
+                    )
                 },
                 onDismiss = { viewModel.onEvent(RadarUiEvent.DismissOwnProfile) },
                 modifier = Modifier
@@ -427,6 +526,65 @@ private fun CenterHub(isScanning: Boolean) {
                     fontWeight = FontWeight.SemiBold,
                 ),
                 color = MaterialTheme.colorScheme.onPrimary,
+            )
+        }
+    }
+}
+
+/**
+ * Banner flotante glassmorphism que avisa al usuario que tiene
+ * solicitudes de handshake entrantes. Se monta dentro de un
+ * `Box.align(TopCenter)` en [RadarScreen] y solo se renderiza
+ * cuando `state.incomingHandshakes` no está vacío.
+ */
+@Composable
+private fun HandshakeIncomingBanner(
+    count: Int,
+    displayName: String,
+    onView: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    com.example.airvibe.core.designsystem.components.GlassCard(
+        modifier = modifier,
+        cornerRadius = 22.dp,
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(
+            horizontal = 16.dp,
+            vertical = 12.dp,
+        ),
+    ) {
+        androidx.compose.foundation.layout.Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            androidx.compose.foundation.layout.Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.weight(1f),
+            ) {
+                androidx.compose.material3.Icon(
+                    imageVector = androidx.compose.material.icons.Icons.Rounded.PersonAddAlt,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp),
+                )
+                androidx.compose.material3.Text(
+                    text = androidx.compose.ui.res.stringResource(
+                        com.example.airvibe.R.string.handshake_banner_incoming,
+                        count,
+                    ) + " · $displayName",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                )
+            }
+            com.example.airvibe.core.designsystem.components.LiquidGlassButton(
+                text = androidx.compose.ui.res.stringResource(
+                    com.example.airvibe.R.string.handshake_banner_view,
+                ),
+                onClick = onView,
+                variant = com.example.airvibe.core.designsystem.components.LiquidGlassVariant.Primary,
             )
         }
     }

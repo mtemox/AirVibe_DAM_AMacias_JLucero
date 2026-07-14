@@ -1,5 +1,7 @@
 package com.example.airvibe.feature.radar.domain.repository
 
+import com.example.airvibe.feature.radar.domain.model.PresenceStatus
+import com.example.airvibe.feature.radar.domain.model.RadarNodeKind
 import com.example.airvibe.feature.radar.domain.scanner.ScannerProfile
 import kotlinx.coroutines.flow.Flow
 
@@ -18,6 +20,37 @@ interface ScannerProfileRepository {
         status: String,
         tags: List<String>,
     )
+
+    /**
+     * Persistir el "tipo" de nodo anunciado (Persona, Servicio o
+     * Grupo). Se usa para colorear la burbuja de los peers en su
+     * radar.
+     */
+    suspend fun updateKind(kind: RadarNodeKind)
+
+    /** Persistir el estado de presencia actual (Online, Available…). */
+    suspend fun updatePresence(presence: PresenceStatus)
+
+    /**
+     * Persistir la profesión / título corto del usuario
+     * (Feature 2 — Payload). Aparece en el `headline` del
+     * preview y se incluye en el Payload v3.
+     */
+    suspend fun updateHeadline(headline: String)
+
+    /**
+     * Persistir la biografía corta (1–2 frases). Aparece en el
+     * preview sheet al tocar un nodo.
+     */
+    suspend fun updateBio(bio: String)
+
+    /**
+     * Activar o desactivar el modo Premium. Cuando se activa, se
+     * transmite un Payload v3 con [premiumCatalog] (si fue
+     * establecido) para que los peers lo vean en su radar sin
+     * necesidad de "hacer match".
+     */
+    suspend fun updatePremium(isPremium: Boolean, catalog: String? = null)
 
     /** Sincroniza el nombre desde Supabase Auth si el usuario no lo editó. */
     suspend fun applyAuthDisplayName(displayName: String?)

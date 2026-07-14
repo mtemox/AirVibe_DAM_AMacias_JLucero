@@ -19,3 +19,19 @@ data class RoomMessage(
     val createdAt: Long,
     val isOwn: Boolean,
 )
+
+/**
+ * Feature 4 — Miembro de una sala. Solo se persisten miembros
+ * activos. Cuando un Guest sale, su fila se marca como
+ * `isActive = false` para mantener historial.
+ */
+data class RoomMember(
+    val id: Long,
+    val roomId: String,
+    val nodeId: String,
+    val displayName: String,
+    val role: String,
+    val isActive: Boolean,
+    val joinedAt: Long,
+    val lastSeenAt: Long,
+)

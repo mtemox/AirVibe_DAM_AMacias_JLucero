@@ -22,6 +22,7 @@ enum class PresenceStatus(val displayName: String) {
     Busy("Ocupado"),
     Looking("En busca de…"),
     Away("Ausente"),
+    Emergency("Emergencia"),
 }
 
 /**
@@ -37,6 +38,12 @@ enum class PresenceStatus(val displayName: String) {
  * @property distanceNormalized distancia radial normalizada (0 = centro, 1 = borde)
  * @property signalStrength intensidad de la señal (0..1)
  * @property accentColor color de acento asociado al nodo
+ * @property headline profesión o título corto (separado de [status])
+ * @property bio biografía corta (1–2 frases)
+ * @property isPremium indica si el peer es Premium y trae un
+ *   Payload extendido (Payload v3)
+ * @property premiumCatalog portafolio o mini-catálogo de precios
+ *   que un Premium puede anunciar (null si no aplica)
  */
 data class RadarNode(
     val id: String,
@@ -50,6 +57,10 @@ data class RadarNode(
     val signalStrength: Float,
     val accentColor: Color,
     val tags: List<String> = emptyList(),
+    val headline: String = "",
+    val bio: String = "",
+    val isPremium: Boolean = false,
+    val premiumCatalog: String? = null,
 ) {
     init {
         require(angleDegrees in 0f..360f) { "angleDegrees must be in 0..360" }

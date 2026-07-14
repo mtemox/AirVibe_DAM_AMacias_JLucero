@@ -28,6 +28,7 @@ import androidx.compose.material.icons.automirrored.rounded.Chat
 import androidx.compose.material.icons.rounded.PersonAddAlt
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.StarBorder
+import androidx.compose.material.icons.rounded.WorkspacePremium
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -60,6 +61,7 @@ fun ProfilePreviewContent(
     onAddContact: () -> Unit,
     onToggleFavorite: () -> Unit,
     modifier: Modifier = Modifier,
+    onSendHandshake: (() -> Unit)? = null,
 ) {
     val tokens = AirVibeTheme.glass
 
@@ -254,7 +256,97 @@ fun ProfilePreviewContent(
             )
         }
 
+        // -------- Feature 2: Payload extendido (Premium + bio) --------
+        // No modificamos los bloques existentes; añadimos el resumen
+        // del Payload recibido vía Nearby como un nuevo GlassCard
+        // al final, respetando el estilo glassmorphism minimalista.
+        if (profile.isPremium || profile.bio.isNotBlank()) {
+            Spacer(modifier = Modifier.height(14.dp))
+            GlassCard(
+                modifier = Modifier.fillMaxWidth(),
+                cornerRadius = 22.dp,
+                contentPadding = PaddingValues(18.dp),
+                tint = if (profile.isPremium) {
+                    Color(0xFFD4AF37).copy(alpha = 0.10f)
+                } else {
+                    Color.Unspecified
+                },
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.WorkspacePremium,
+                            contentDescription = null,
+                            tint = if (profile.isPremium) {
+                                Color(0xFFD4AF37)
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Text(
+                            text = if (profile.isPremium) "Perfil Premium" else "Sobre el perfil",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        if (profile.isPremium) {
+                            GlassPill(
+                                text = "Premium",
+                                tint = Color(0xFFD4AF37),
+                            )
+                        }
+                    }
+                    if (profile.bio.isNotBlank()) {
+                        Text(
+                            text = profile.bio,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                    val catalog = profile.premiumCatalog
+                    if (profile.isPremium && !catalog.isNullOrBlank()) {
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "Catálogo / portafolio",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = Color(0xFFD4AF37),
+                        )
+                        Text(
+                            text = catalog,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                }
+            }
+        }
+
         Spacer(modifier = Modifier.height(10.dp))
+
+        // -------- Feature 3: Botón "Enviar solicitud" (Handshake) --------
+        // Nuevo bloque al final; NO reemplaza los botones existentes
+        // ("Conectar" y "Agregar"). Solo se renderiza si la pantalla
+        // nos pasa un callback [onSendHandshake].
+        if (onSendHandshake != null) {
+            Spacer(modifier = Modifier.height(8.dp))
+            LiquidGlassButton(
+                text = androidx.compose.ui.res.stringResource(
+                    com.example.airvibe.R.string.handshake_action_send,
+                ),
+                onClick = onSendHandshake,
+                icon = androidx.compose.material.icons.Icons.Rounded.PersonAddAlt,
+                variant = LiquidGlassVariant.Primary,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
     }
 }
 
@@ -288,4 +380,5 @@ private fun presenceColor(presence: PresenceStatus): Color = when (presence) {
     PresenceStatus.Looking -> MaterialTheme.colorScheme.primary
     PresenceStatus.Busy -> MaterialTheme.colorScheme.error
     PresenceStatus.Away -> MaterialTheme.colorScheme.outline
+    PresenceStatus.Emergency -> Color(0xFFF43F5E)
 }

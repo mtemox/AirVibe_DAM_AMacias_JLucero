@@ -55,4 +55,17 @@
     <string name="room_invite_notification_title">%1$s creó una sala cercana</string>
     <string name="room_invite_notification_body">Únete para chatear: %1$s</string>
     <string name="room_invite_action_join">Unirse</string>
+
+    <!-- Feature 3 — Handshake notifications -->
+    <string name="handshake_channel_name">Solicitudes de conexión</string>
+    <string name="handshake_channel_description">Recibe notificaciones nativas cuando alguien cerca quiere conectar contigo.</string>
+    <string name="handshake_notification_title">%1$s quiere conectar</string>
+    <string name="handshake_notification_default_body">Toca para ver su perfil y responder.</string>
+    <string name="handshake_action_accept">Aceptar</string>
+    <string name="handshake_action_reject">Rechazar</string>
+    <string name="handshake_action_send">Enviar solicitud</string>
+    <string name="handshake_request_sheet_title">Solicitud de conexión</string>
+    <string name="handshake_request_sheet_body">%1$s quiere agregar a AirVibe contigo. Al aceptar, ambos perfiles se guardarán en sus contactos.</string>
+    <string name="handshake_banner_incoming">Tienes %1$d solicitud(es) de conexión</string>
+    <string name="handshake_banner_view">Ver</string>
 </resources>

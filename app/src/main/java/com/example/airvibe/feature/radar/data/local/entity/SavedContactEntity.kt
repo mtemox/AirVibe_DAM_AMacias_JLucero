@@ -8,6 +8,10 @@ import androidx.room.PrimaryKey
 /**
  * Contacto guardado de forma persistente, independiente del radar en vivo.
  * Sobrevive a desconexiones, reinicios de escaneo y borrado de peers.
+ *
+ * Campos del **Payload extendido (Feature 2)**: [headline], [bio],
+ * [isPremium], [premiumCatalog]. Permiten mostrar el catálogo de un
+ * peer Premium aunque ya no esté cerca.
  */
 @Entity(
     tableName = "saved_contacts",
@@ -22,10 +26,10 @@ data class SavedContactEntity(
     val displayName: String,
 
     @ColumnInfo(name = "headline")
-    val headline: String,
+    val headline: String = "",
 
     @ColumnInfo(name = "bio")
-    val bio: String,
+    val bio: String = "",
 
     @ColumnInfo(name = "status")
     val status: String,
@@ -38,6 +42,12 @@ data class SavedContactEntity(
 
     @ColumnInfo(name = "accent_color_argb")
     val accentColorArgb: Int,
+
+    @ColumnInfo(name = "is_premium", defaultValue = "0")
+    val isPremium: Boolean = false,
+
+    @ColumnInfo(name = "premium_catalog")
+    val premiumCatalog: String? = null,
 
     @ColumnInfo(name = "added_by_peer")
     val addedByPeer: Boolean = false,

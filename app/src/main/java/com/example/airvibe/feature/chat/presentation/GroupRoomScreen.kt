@@ -9,13 +9,19 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Groups
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -32,6 +38,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.airvibe.core.designsystem.components.AirVibeAmbientBackground
+import com.example.airvibe.core.designsystem.components.AvatarMonogram
+import com.example.airvibe.core.designsystem.components.GlassPill
 import com.example.airvibe.feature.chat.domain.model.RoomMessage
 import com.example.airvibe.feature.chat.presentation.components.ChatComposer
 import com.example.airvibe.feature.chat.presentation.components.ChatTopBar
@@ -94,6 +102,15 @@ fun GroupRoomScreen(
                     }
                 }
                 else -> {
+                    // -------- Feature 4: header con miembros (nuevo) --------
+                    // No reemplaza ninguna parte de la pantalla. Solo
+                    // añade una barra con el conteo y avatares
+                    // apilados por encima de la lista de mensajes.
+                    RoomMembersHeader(
+                        memberCount = state.memberCount,
+                        hostName = room?.hostName.orEmpty(),
+                    )
+
                     // reverseLayout=true: newest message at the bottom, scroll up for history
                     LazyColumn(
                         modifier = Modifier
@@ -181,4 +198,85 @@ private fun RoomMessageBubble(message: RoomMessage) {
 private fun groupRoomViewModel(roomId: String): GroupRoomViewModel {
     val factory = remember(roomId) { GroupRoomViewModel.Factory(roomId) }
     return viewModel(factory = factory, key = "room:$roomId")
+}
+
+/**
+ * Feature 4 — Cabecera con la lista de miembros activos de la
+ * sala. Se renderiza como un bloque nuevo al inicio de la
+ * pantalla, sin reemplazar la top bar ni la lista de mensajes.
+ */
+@Composable
+private fun RoomMembersHeader(
+    memberCount: Int,
+    hostName: String,
+) {
+    if (memberCount <= 0 && hostName.isBlank()) return
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(32.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Groups,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(18.dp),
+            )
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "Sala activa",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = buildString {
+                    append("$memberCount participante${if (memberCount == 1) "" else "s"}")
+                    if (hostName.isNotBlank()) {
+                        append(" · Anfitrión: ")
+                        append(hostName)
+                    }
+                },
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+            )
+        }
+        if (memberCount >= 2) {
+            // Avatares apilados simples
+            Row(
+                horizontalArrangement = Arrangement.spacedBy((-6).dp),
+            ) {
+                repeat(3) { index ->
+                    val label = if (index == 0) hostName else "Invitado ${index + 1}"
+                    Box(
+                        modifier = Modifier
+                            .size(24.dp)
+                            .offset(x = (-index * 6).dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.surface),
+                    ) {
+                        AvatarMonogram(
+                            name = label,
+                            size = 24.dp,
+                        )
+                    }
+                }
+                if (memberCount > 3) {
+                    GlassPill(
+                        text = "+${memberCount - 3}",
+                    )
+                }
+            }
+        }
+    }
 }

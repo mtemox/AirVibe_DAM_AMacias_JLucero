@@ -51,6 +51,7 @@ class AirVibeScannerService : Service() {
         runCatching { ScannerNotificationFactory.ensureChannel(this) }
         runCatching { MatchNotificationManager.ensureChannel(this) }
         runCatching { com.example.airvibe.feature.chat.data.notification.RoomInviteNotificationManager.ensureChannel(this) }
+        runCatching { com.example.airvibe.feature.radar.data.device.handshake.HandshakeRequestNotificationManager.ensureChannel(this) }
         runCatching { ServiceLocator.startMatchManager() }
     }
 
@@ -71,8 +72,10 @@ class AirVibeScannerService : Service() {
     private fun handleStart() {
         try {
             startInForeground(paused = false)
+            ScannerServiceState.markRunning()
         } catch (e: SecurityException) {
             Log.e(TAG, "Foreground service start denied", e)
+            ScannerServiceState.markStopped()
             stopSelf()
             return
         }
@@ -96,6 +99,7 @@ class AirVibeScannerService : Service() {
             @Suppress("DEPRECATION")
             stopForeground(true)
         }
+        ScannerServiceState.markStopped()
         stopSelf()
     }
 
@@ -116,6 +120,7 @@ class AirVibeScannerService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         startedForeground = false
+        ScannerServiceState.markStopped()
         Log.d(TAG, "AirVibeScannerService destroyed")
     }
 

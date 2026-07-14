@@ -49,7 +49,14 @@ fun MainScreen(
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
-            DrawerContent()
+            DrawerContent(
+                onSignOutClick = {
+                    scope.launch {
+                        drawerState.close()
+                        com.example.airvibe.core.di.ServiceLocator.authRepository.signOut()
+                    }
+                }
+            )
         }
     ) {
         Scaffold(

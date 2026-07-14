@@ -1,6 +1,7 @@
 package com.example.airvibe.feature.radar.data.sync
 
 import android.content.Context
+import android.util.Log
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
@@ -11,6 +12,7 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.example.airvibe.core.di.ServiceLocator
+import com.example.airvibe.feature.radar.data.mapper.toEntity
 import com.example.airvibe.feature.radar.data.mapper.toRemoteNode
 import com.example.airvibe.feature.radar.domain.remote.RemoteNodeDataSource
 import kotlinx.coroutines.flow.first
@@ -42,9 +44,25 @@ class SyncWorker(
             if (error.isRetryable()) return Result.retry()
         }
 
-        // Push radar nodes
+        // Pull radar nodes
         val radarDao = ServiceLocator.radarDao
         val remote: RemoteNodeDataSource = ServiceLocator.remoteNodeDataSource
+        
+        val remoteNodesOutcome = remote.fetchAll(userId)
+        if (remoteNodesOutcome.isSuccess) {
+            val remoteNodes = remoteNodesOutcome.getOrNull() ?: emptyList()
+            remoteNodes.forEach { remoteNode ->
+                val localNode = radarDao.getById(remoteNode.id)
+                if (localNode == null || localNode.isSynced) {
+                    radarDao.upsertAll(listOf(remoteNode.toEntity()))
+                }
+            }
+        } else {
+            val error = remoteNodesOutcome.exceptionOrNull()
+            if (error?.isRetryable() == true) return Result.retry()
+        }
+
+        // Push radar nodes
         val pendingNodes = radarDao.observePendingSync().first()
         if (pendingNodes.isNotEmpty()) {
             val remoteNodes = pendingNodes.map { it.toRemoteNode() }
@@ -60,12 +78,22 @@ class SyncWorker(
 
         // Push contacts, rooms, room messages
         val pushOutcome = cloudSync.pushPending(userId)
-        return if (pushOutcome.isSuccess) {
-            Result.success()
-        } else {
+        if (pushOutcome.isFailure) {
             val error = pushOutcome.exceptionOrNull()
-            if (error.isRetryable()) Result.retry() else Result.failure()
+            if (error.isRetryable()) return Result.retry()
         }
+
+        // Feature 5: pull de la "visibilidad" para el dashboard
+        // Premium. Si falla por red, no es bloqueante — sólo
+        // significa que el dashboard mostrará datos locales.
+        runCatching { cloudSync.pullVisibility(userId) }
+            .onFailure { Log.w(TAG, "pullVisibility failed: ${it.message}") }
+
+        return Result.success()
+    }
+
+    companion object {
+        private const val TAG = "SyncWorker"
     }
 }
 
@@ -82,6 +110,8 @@ private fun Throwable?.isRetryable(): Boolean = when (this) {
 }
 
 object SyncScheduler {
+
+    private const val TAG = "SyncScheduler"
 
     const val UNIQUE_ONE_TIME = "airvibe.sync.once"
     const val UNIQUE_PERIODIC = "airvibe.sync.periodic"

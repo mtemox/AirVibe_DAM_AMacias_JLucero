@@ -23,6 +23,8 @@ object ContactMapper {
         presence = presence.name,
         tags = tags,
         accentColorArgb = accentColorArgb,
+        isPremium = isPremium,
+        premiumCatalog = premiumCatalog,
         addedByPeer = addedByPeer,
         isSynced = isSynced,
         createdAt = createdAt,
@@ -32,12 +34,14 @@ object ContactMapper {
     fun NodeEntity.toSavedContact(addedByPeer: Boolean = false): SavedContactEntity = SavedContactEntity(
         nodeId = id,
         displayName = displayName,
-        headline = status,
-        bio = detail,
+        headline = headline,
+        bio = bio,
         status = status,
         presence = presence,
         tags = tags,
         accentColorArgb = accentColorArgb,
+        isPremium = isPremium,
+        premiumCatalog = premiumCatalog,
         addedByPeer = addedByPeer,
         isSynced = false,
         createdAt = System.currentTimeMillis(),
@@ -56,6 +60,8 @@ object ContactMapper {
         distanceMeters = 0,
         isFavorite = true,
         accentHue = accentHueFrom(accentColorArgb),
+        isPremium = isPremium,
+        premiumCatalog = premiumCatalog,
     )
 
     fun accentArgbFromProfile(profile: PersonProfile): Int =

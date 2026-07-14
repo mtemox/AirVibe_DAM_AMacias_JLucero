@@ -7,28 +7,43 @@ import com.example.airvibe.feature.chat.data.remote.SupabaseRoomMessageDataSourc
 import com.example.airvibe.feature.chat.data.remote.toEntity
 import com.example.airvibe.feature.chat.data.remote.toRemoteDto
 import com.example.airvibe.feature.chat.data.local.dao.ProximityRoomDao
+import com.example.airvibe.feature.radar.data.local.dao.ProfileViewDao
 import com.example.airvibe.feature.radar.data.local.dao.SavedContactDao
 import com.example.airvibe.feature.radar.data.remote.SupabaseSavedContactDataSource
+import com.example.airvibe.feature.radar.data.remote.SupabaseTelemetryDataSource
+import com.example.airvibe.feature.radar.data.remote.RemoteVisibilityDayDto
 import com.example.airvibe.feature.radar.data.remote.toEntity
 import com.example.airvibe.feature.radar.data.remote.toRemoteDto
+import com.example.airvibe.feature.radar.data.remote.toRemoteDto as toRemoteTelemetryDto
+import com.example.airvibe.feature.radar.data.remote.toEntity as toTelemetryEntity
+import com.example.airvibe.feature.radar.domain.model.VisibilityDay
+import com.example.airvibe.feature.radar.domain.model.VisibilityStats
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
+import java.util.TimeZone
 
 /**
  * Sincroniza datos offline-first con Supabase:
  * - Amigos guardados ([saved_contacts])
  * - Salas cercanas ([proximity_rooms])
  * - Mensajes de sala ([room_messages])
- * - Mensajes 1-a-1 ([chat_messages])
+ * - Mensajes 1-a-1 ([chat_messages])            ← Feature 5: los empuja
+ * - Telemetría Premium ([profile_views])        ← Feature 5: nuevo
  *
- * Cada usuario respalda su propia copia en la nube (owner_id = auth.uid()).
+ * Cada usuario respalda su propia copia en la nube
+ * (owner_id = auth.uid()).
  */
 class CloudSyncService(
     private val savedContactDao: SavedContactDao,
     private val roomDao: ProximityRoomDao,
     private val chatDao: ChatDao,
+    private val profileViewDao: ProfileViewDao,
     private val savedContactRemote: SupabaseSavedContactDataSource,
     private val roomRemote: SupabaseProximityRoomDataSource,
     private val roomMessageRemote: SupabaseRoomMessageDataSource,
     private val chatMessageRemote: SupabaseChatMessageDataSource,
+    private val telemetryRemote: SupabaseTelemetryDataSource? = null,
 ) {
 
     /** Descarga datos de la nube e inserta lo que falta localmente. */
@@ -45,6 +60,7 @@ class CloudSyncService(
         pushRooms(ownerId)
         pushRoomMessages(ownerId)
         pushChatMessages(ownerId)
+        pushProfileViews(ownerId)
     }
 
     private suspend fun restoreContacts(ownerId: String) {
@@ -115,5 +131,71 @@ class CloudSyncService(
         val dtos = pending.map { it.toRemoteDto(ownerId) }
         val synced = chatMessageRemote.upsert(dtos).getOrNull() ?: return
         chatDao.markAsSynced(synced)
+    }
+
+    // --------- Feature 5: Telemetría ---------
+
+    private suspend fun pushProfileViews(ownerId: String) {
+        val remote = telemetryRemote ?: return
+        val pending = profileViewDao.getPendingSync(200)
+        if (pending.isEmpty()) return
+        val dtos = pending.map { it.toRemoteTelemetryDto() }
+        val result = remote.upsert(dtos)
+        result.onSuccess { _ ->
+            profileViewDao.markAsSynced(pending.map { it.id })
+        }
+    }
+
+    /**
+     * Feature 5 — Sincronización Diferida + Analíticas Premium.
+     * Descarga la `visibility_daily` del usuario Premium actual
+     * y la devuelve como un [VisibilityStats] agregado. Si la
+     * red falla, devuelve un objeto con `totalPendingSync`
+     * útil para mostrar "X vistas en cola, sincroniza cuando
+     * tengas Wi-Fi".
+     */
+    suspend fun pullVisibility(
+        ownerId: String,
+        daysWindow: Int = 30,
+    ): Result<VisibilityStats> = runCatching {
+        val remote = telemetryRemote
+            ?: return@runCatching VisibilityStats.Empty
+        val now = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
+        val from = (now.clone() as Calendar).apply {
+            add(Calendar.DAY_OF_YEAR, -daysWindow)
+        }.time
+        val isoFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US).apply {
+            timeZone = TimeZone.getTimeZone("UTC")
+        }
+        val fromIso = isoFormat.format(from)
+        val toIso = isoFormat.format(now.time)
+        val remoteRows: List<RemoteVisibilityDayDto> = remote
+            .fetchVisibility(ownerId, fromIso, toIso)
+            .getOrNull().orEmpty()
+        val byDay = remoteRows.map { dto ->
+            VisibilityDay(
+                dayIso = dto.day,
+                views = dto.viewsCount,
+                taps = dto.tapsCount,
+                broadcasts = dto.broadcastsCount,
+                uniqueVisitors = dto.uniqueVisitorsCount,
+            )
+        }
+        val sevenAgo = System.currentTimeMillis() - 7L * 86_400_000
+        val thirtyAgo = System.currentTimeMillis() - 30L * 86_400_000
+        val views7 = profileViewDao.countViewsSince(ownerId, sevenAgo)
+        val taps7 = profileViewDao.countTapsSince(ownerId, sevenAgo)
+        val visitors7 = profileViewDao.countUniqueVisitorsSince(ownerId, sevenAgo)
+        val views30 = profileViewDao.countViewsSince(ownerId, thirtyAgo)
+        val taps30 = profileViewDao.countTapsSince(ownerId, thirtyAgo)
+        VisibilityStats(
+            viewsLast7Days = views7,
+            tapsLast7Days = taps7,
+            uniqueVisitorsLast7Days = visitors7,
+            viewsLast30Days = views30,
+            tapsLast30Days = taps30,
+            totalPendingSync = profileViewDao.getPendingSync().size,
+            byDay = byDay,
+        )
     }
 }

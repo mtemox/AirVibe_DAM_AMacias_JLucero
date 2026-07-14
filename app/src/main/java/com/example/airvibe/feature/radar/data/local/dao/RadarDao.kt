@@ -56,12 +56,18 @@ interface RadarDao {
     @Query("DELETE FROM radar_nodes WHERE id = :id")
     suspend fun deleteById(id: String)
 
+    @Query("SELECT COUNT(*) > 0 FROM chat_messages WHERE node_id = :nodeId")
+    suspend fun hasMessages(nodeId: String): Boolean
+
+    @Query("UPDATE radar_nodes SET presence = :presence, updated_at = :timestamp WHERE id = :nodeId")
+    suspend fun updatePresence(nodeId: String, presence: String, timestamp: Long = System.currentTimeMillis())
+
     /**
      * Elimina únicamente los nodos cuyo identificador NO empiece
      * con `LOCAL_`. Sirve para limpiar peers descubiertos por
      * Bluetooth sin tocar los datos del seed.
      */
-    @Query("DELETE FROM radar_nodes WHERE id NOT LIKE 'LOCAL\\_%' ESCAPE '\\'")
+    @Query("DELETE FROM radar_nodes WHERE id NOT LIKE 'LOCAL\\_%' ESCAPE '\\' AND id NOT IN (SELECT DISTINCT node_id FROM chat_messages)")
     suspend fun clearDiscovered()
 
     @Query("SELECT * FROM radar_nodes WHERE is_favorite = 1 ORDER BY display_name ASC")

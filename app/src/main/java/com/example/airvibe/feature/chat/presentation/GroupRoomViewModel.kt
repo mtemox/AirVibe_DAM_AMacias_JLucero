@@ -24,6 +24,7 @@ data class GroupRoomUiState(
     val joined: Boolean = false,
     val isLoading: Boolean = true,
     val loadError: String? = null,
+    val memberCount: Int = 0,
 )
 
 class GroupRoomViewModel(
@@ -61,12 +62,14 @@ class GroupRoomViewModel(
             combine(
                 roomRepository.observeRoom(roomId),
                 roomRepository.observeMessages(roomId),
-            ) { room, messages ->
+                roomRepository.observeActiveMembers(roomId),
+            ) { room, messages, members ->
                 GroupRoomUiState(
                     room = room,
                     messages = messages,
                     joined = room?.joined == true,
                     isLoading = false,
+                    memberCount = members.size,
                 )
             }.collect { state ->
                 _uiState.update {
@@ -75,6 +78,7 @@ class GroupRoomViewModel(
                         messages = state.messages,
                         joined = state.joined,
                         isLoading = it.isLoading && state.room == null,
+                        memberCount = state.memberCount,
                     )
                 }
             }

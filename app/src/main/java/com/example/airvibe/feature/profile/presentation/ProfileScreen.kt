@@ -72,6 +72,7 @@ fun ProfileScreen(
     val profile by viewModel.profile.collectAsStateWithLifecycle()
     val stats by viewModel.stats.collectAsStateWithLifecycle()
     val isUpdating by viewModel.isUpdating.collectAsStateWithLifecycle()
+    val visibility by viewModel.visibility.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     var isEditSheetVisible by remember { mutableStateOf(false) }
@@ -227,6 +228,13 @@ fun ProfileScreen(
                 StatCard(value = stats.friends.toString(), label = "Friends", modifier = Modifier.weight(1f))
             }
 
+            // -------- Feature 5: Visibilidad Premium (nuevo bloque) --------
+            Spacer(modifier = Modifier.height(20.dp))
+            PremiumVisibilityCard(
+                state = visibility,
+                onRefresh = { viewModel.refreshVisibility() },
+            )
+
             Spacer(modifier = Modifier.height(32.dp))
 
             // Settings List
@@ -251,11 +259,10 @@ fun ProfileScreen(
             dragHandle = null,
         ) {
             val sheetShape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)
-            EditProfileSheet(
-                currentProfile = profile,
-                isUpdating = isUpdating,
-                onSave = { name, status, tags ->
-                    viewModel.updateProfile(name, status, tags)
+            com.example.airvibe.feature.radar.presentation.components.OwnProfileSheet(
+                profile = profile,
+                onSave = { draft ->
+                    viewModel.updateProfile(draft)
                     isEditSheetVisible = false
                 },
                 onDismiss = { if (!isUpdating) isEditSheetVisible = false },
@@ -366,6 +373,159 @@ fun SettingsItem(icon: ImageVector, title: String, subtitle: String) {
             imageVector = Icons.Rounded.ChevronRight,
             contentDescription = "Go",
             tint = MaterialTheme.colorScheme.outlineVariant
+        )
+    }
+}
+
+/**
+ * Feature 5 — Bloque "Visibilidad Premium". Se renderiza debajo
+ * del Stats Bento. NO reemplaza ningún componente existente; sólo
+ * añade una tarjeta glassmorphism con los contadores de
+ * `profile_views` y `taps` recibidos por el perfil del usuario
+ * en los últimos 7 / 30 días, además del número de eventos
+ * aún sin sincronizar.
+ */
+@Composable
+private fun PremiumVisibilityCard(
+    state: ProfileVisibilityState,
+    onRefresh: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                color = Color(0xFF305CDE).copy(alpha = 0.06f),
+                shape = RoundedCornerShape(20.dp),
+            )
+            .border(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+                shape = RoundedCornerShape(20.dp),
+            )
+            .padding(16.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f), CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Share,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+                Column {
+                    Text(
+                        text = "Visibilidad Premium",
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+                        color = MaterialTheme.colorScheme.onBackground,
+                    )
+                    Text(
+                        text = if (state.isPremium) {
+                            "Tu perfil en el radar de los demás"
+                        } else {
+                            "Inicia sesión para ver tu alcance"
+                        },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            if (state.isPremium) {
+                Icon(
+                    imageVector = Icons.Rounded.ChevronRight,
+                    contentDescription = "Refrescar",
+                    tint = MaterialTheme.colorScheme.outlineVariant,
+                    modifier = Modifier.clickable { onRefresh() },
+                )
+            }
+        }
+        if (!state.isPremium) return@Column
+        Spacer(Modifier.height(12.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            VisibilityStatTile(
+                title = "Vistas 7d",
+                value = state.stats.viewsLast7Days.toString(),
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.weight(1f),
+            )
+            VisibilityStatTile(
+                title = "Toques 7d",
+                value = state.stats.tapsLast7Days.toString(),
+                tint = MaterialTheme.colorScheme.tertiary,
+                modifier = Modifier.weight(1f),
+            )
+            VisibilityStatTile(
+                title = "Vistas 30d",
+                value = state.stats.viewsLast30Days.toString(),
+                tint = MaterialTheme.colorScheme.secondary,
+                modifier = Modifier.weight(1f),
+            )
+        }
+        if (state.stats.totalPendingSync > 0) {
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = "${state.stats.totalPendingSync} evento(s) pendientes de sincronizar",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (state.errorMessage != null) {
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = "No se pudo sincronizar: ${state.errorMessage}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+    }
+}
+
+@Composable
+private fun VisibilityStatTile(
+    title: String,
+    value: String,
+    tint: Color,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .background(
+                color = Color.White,
+                shape = RoundedCornerShape(14.dp),
+            )
+            .border(
+                width = 1.dp,
+                color = tint.copy(alpha = 0.25f),
+                shape = RoundedCornerShape(14.dp),
+            )
+            .padding(12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+            color = tint,
+        )
+        Text(
+            text = title,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }

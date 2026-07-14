@@ -8,6 +8,12 @@ enum class NearbyChatPayloadKind {
     GroupInvite,
     RoomMessage,
     FriendAdd,
+    HandshakeRequest,
+    HandshakeAccept,
+    HandshakeReject,
+    RoomJoin,
+    RoomLeave,
+    RoomAnnounce,
 }
 
 /**
@@ -18,6 +24,16 @@ enum class NearbyChatPayloadKind {
  *   v2|invite|<messageId>|<senderNodeId>|<text>|<createdAtMillis>|<roomId>|<hostName>
  *   v2|room|<messageId>|<senderNodeId>|<senderName>|<roomId>|<text>|<createdAtMillis>
  *   v2|friend|<messageId>|<senderNodeId>|<displayName>|<status>|<detail>|<tags>|<createdAtMillis>
+ *
+ * Feature 3 — Handshake:
+ *   v2|hs_req|<handshakeId>|<senderNodeId>|<displayName>|<headline>|<status>|<presence>|<tags\u001F…>|<key>|<createdAtMillis>
+ *   v2|hs_ok|<handshakeId>|<senderNodeId>|<key>|<createdAtMillis>
+ *   v2|hs_no|<handshakeId>|<senderNodeId>|<createdAtMillis>
+ *
+ * Feature 4 — Salas de Proximidad:
+ *   v2|rm_join|<roomId>|<senderNodeId>|<displayName>|<hostNodeId>|<roomTitle>|<createdAtMillis>
+ *   v2|rm_leave|<roomId>|<senderNodeId>|<createdAtMillis>
+ *   v2|rm_annc|<roomId>|<senderNodeId>|<senderName>|<messageId>|<text>|<createdAtMillis>
  */
 internal object NearbyChatPayloadCodec {
 
@@ -26,6 +42,12 @@ internal object NearbyChatPayloadCodec {
     const val TYPE_INVITE = "invite"
     const val TYPE_ROOM = "room"
     const val TYPE_FRIEND = "friend"
+    const val TYPE_HANDSHAKE_REQUEST = "hs_req"
+    const val TYPE_HANDSHAKE_ACCEPT = "hs_ok"
+    const val TYPE_HANDSHAKE_REJECT = "hs_no"
+    const val TYPE_ROOM_JOIN = "rm_join"
+    const val TYPE_ROOM_LEAVE = "rm_leave"
+    const val TYPE_ROOM_ANNOUNCE = "rm_annc"
 
     private const val FIELD_SEPARATOR = "|"
     private const val DELIMITER = "\u001F"
@@ -100,6 +122,135 @@ internal object NearbyChatPayloadCodec {
             sanitize(status),
             sanitize(detail),
             sanitize(tagsField),
+            createdAtMillis.toString(),
+        ).joinToString(FIELD_SEPARATOR)
+        return payload.toByteArray(Charsets.UTF_8)
+    }
+
+    /**
+     * Feature 3 — Handshake.
+     * Serializa una solicitud de conexión P2P. Incluye un
+     * [handshakeId] único, un [key] opaco (la "llave" del feature)
+     * y un snapshot del perfil para que el receptor pueda decidir
+     * con quién conectar.
+     */
+    fun encodeHandshakeRequest(
+        handshakeId: String,
+        senderNodeId: String,
+        displayName: String,
+        headline: String,
+        status: String,
+        presence: String,
+        tags: List<String>,
+        key: String,
+        createdAtMillis: Long,
+    ): ByteArray {
+        val tagsField = tags.joinToString(DELIMITER)
+        val payload = listOf(
+            SCHEMA_VERSION,
+            TYPE_HANDSHAKE_REQUEST,
+            sanitize(handshakeId),
+            sanitize(senderNodeId),
+            sanitize(displayName),
+            sanitize(headline),
+            sanitize(status),
+            sanitize(presence),
+            sanitize(tagsField),
+            sanitize(key),
+            createdAtMillis.toString(),
+        ).joinToString(FIELD_SEPARATOR)
+        return payload.toByteArray(Charsets.UTF_8)
+    }
+
+    fun encodeHandshakeAccept(
+        handshakeId: String,
+        senderNodeId: String,
+        key: String,
+        createdAtMillis: Long,
+    ): ByteArray {
+        val payload = listOf(
+            SCHEMA_VERSION,
+            TYPE_HANDSHAKE_ACCEPT,
+            sanitize(handshakeId),
+            sanitize(senderNodeId),
+            sanitize(key),
+            createdAtMillis.toString(),
+        ).joinToString(FIELD_SEPARATOR)
+        return payload.toByteArray(Charsets.UTF_8)
+    }
+
+    fun encodeHandshakeReject(
+        handshakeId: String,
+        senderNodeId: String,
+        createdAtMillis: Long,
+    ): ByteArray {
+        val payload = listOf(
+            SCHEMA_VERSION,
+            TYPE_HANDSHAKE_REJECT,
+            sanitize(handshakeId),
+            sanitize(senderNodeId),
+            createdAtMillis.toString(),
+        ).joinToString(FIELD_SEPARATOR)
+        return payload.toByteArray(Charsets.UTF_8)
+    }
+
+    /**
+     * Feature 4 — Un Guest le pide al Host unirse a la sala.
+     * El Host responde con un [RoomMessage] de broadcast a todos
+     * los miembros (incluyendo el recién llegado).
+     */
+    fun encodeRoomJoin(
+        roomId: String,
+        senderNodeId: String,
+        displayName: String,
+        hostNodeId: String,
+        roomTitle: String,
+        createdAtMillis: Long,
+    ): ByteArray {
+        val payload = listOf(
+            SCHEMA_VERSION,
+            TYPE_ROOM_JOIN,
+            sanitize(roomId),
+            sanitize(senderNodeId),
+            sanitize(displayName),
+            sanitize(hostNodeId),
+            sanitize(roomTitle),
+            createdAtMillis.toString(),
+        ).joinToString(FIELD_SEPARATOR)
+        return payload.toByteArray(Charsets.UTF_8)
+    }
+
+    fun encodeRoomLeave(
+        roomId: String,
+        senderNodeId: String,
+        createdAtMillis: Long,
+    ): ByteArray {
+        val payload = listOf(
+            SCHEMA_VERSION,
+            TYPE_ROOM_LEAVE,
+            sanitize(roomId),
+            sanitize(senderNodeId),
+            createdAtMillis.toString(),
+        ).joinToString(FIELD_SEPARATOR)
+        return payload.toByteArray(Charsets.UTF_8)
+    }
+
+    fun encodeRoomAnnounce(
+        roomId: String,
+        senderNodeId: String,
+        senderName: String,
+        messageId: String,
+        text: String,
+        createdAtMillis: Long,
+    ): ByteArray {
+        val payload = listOf(
+            SCHEMA_VERSION,
+            TYPE_ROOM_ANNOUNCE,
+            sanitize(roomId),
+            sanitize(senderNodeId),
+            sanitize(senderName),
+            sanitize(messageId),
+            sanitize(text),
             createdAtMillis.toString(),
         ).joinToString(FIELD_SEPARATOR)
         return payload.toByteArray(Charsets.UTF_8)
@@ -201,6 +352,88 @@ internal object NearbyChatPayloadCodec {
                     senderTags = tags,
                 )
             }
+            TYPE_HANDSHAKE_REQUEST -> {
+                if (parts.size < 11) return null
+                val createdAt = parts[10].toLongOrNull() ?: return null
+                val tags = parts[8].split(DELIMITER)
+                    .map { it.trim() }
+                    .filter { it.isNotEmpty() }
+                DecodedChatPayload(
+                    kind = NearbyChatPayloadKind.HandshakeRequest,
+                    messageId = parts[2],
+                    senderNodeId = parts[3],
+                    text = parts[4],
+                    createdAtMillis = createdAt,
+                    senderDisplayName = parts[4],
+                    senderHeadline = parts[5],
+                    senderStatus = parts[6],
+                    senderPresence = parts[7],
+                    senderTags = tags,
+                    senderHandshakeKey = parts[9],
+                )
+            }
+            TYPE_HANDSHAKE_ACCEPT -> {
+                if (parts.size < 6) return null
+                val createdAt = parts[5].toLongOrNull() ?: return null
+                DecodedChatPayload(
+                    kind = NearbyChatPayloadKind.HandshakeAccept,
+                    messageId = parts[2],
+                    senderNodeId = parts[3],
+                    text = "",
+                    createdAtMillis = createdAt,
+                    senderHandshakeKey = parts[4],
+                )
+            }
+            TYPE_HANDSHAKE_REJECT -> {
+                if (parts.size < 5) return null
+                val createdAt = parts[4].toLongOrNull() ?: return null
+                DecodedChatPayload(
+                    kind = NearbyChatPayloadKind.HandshakeReject,
+                    messageId = parts[2],
+                    senderNodeId = parts[3],
+                    text = "",
+                    createdAtMillis = createdAt,
+                )
+            }
+            TYPE_ROOM_JOIN -> {
+                if (parts.size < 8) return null
+                val createdAt = parts[7].toLongOrNull() ?: return null
+                DecodedChatPayload(
+                    kind = NearbyChatPayloadKind.RoomJoin,
+                    messageId = parts[2],
+                    senderNodeId = parts[3],
+                    text = parts[4],
+                    createdAtMillis = createdAt,
+                    senderDisplayName = parts[4],
+                    roomId = parts[2],
+                    senderHeadline = parts[6],
+                )
+            }
+            TYPE_ROOM_LEAVE -> {
+                if (parts.size < 5) return null
+                val createdAt = parts[4].toLongOrNull() ?: return null
+                DecodedChatPayload(
+                    kind = NearbyChatPayloadKind.RoomLeave,
+                    messageId = parts[2],
+                    senderNodeId = parts[3],
+                    text = "",
+                    createdAtMillis = createdAt,
+                    roomId = parts[2],
+                )
+            }
+            TYPE_ROOM_ANNOUNCE -> {
+                if (parts.size < 8) return null
+                val createdAt = parts[7].toLongOrNull() ?: return null
+                DecodedChatPayload(
+                    kind = NearbyChatPayloadKind.RoomAnnounce,
+                    messageId = parts[5],
+                    senderNodeId = parts[3],
+                    text = parts[6],
+                    createdAtMillis = createdAt,
+                    senderDisplayName = parts[4],
+                    roomId = parts[2],
+                )
+            }
             else -> null
         }
     }
@@ -229,4 +462,10 @@ data class DecodedChatPayload(
     val senderStatus: String? = null,
     val senderDetail: String? = null,
     val senderTags: List<String> = emptyList(),
+    /** Feature 3 — Handshake. Identifica la solicitud de conexión. */
+    val senderHandshakeKey: String? = null,
+    /** Feature 3 — Handshake. Profesión / título del solicitante. */
+    val senderHeadline: String? = null,
+    /** Feature 3 — Handshake. Presencia (Online, Available…). */
+    val senderPresence: String? = null,
 )

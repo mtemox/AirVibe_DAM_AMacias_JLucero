@@ -17,6 +17,12 @@ import androidx.room.PrimaryKey
  *
  * El color de acento se almacena como ARGB en [accentColorArgb] para
  * evitar un converter dedicado y conservar eficiencia en lectura.
+ *
+ * Campos del **Payload extendido (Feature 2)**:
+ *  - [headline] profesión / título corto
+ *  - [bio] biografía (1–2 frases)
+ *  - [isPremium] indica si el peer paga Premium
+ *  - [premiumCatalog] portafolio o mini-catálogo (null si no aplica)
  */
 @Entity(
     tableName = "radar_nodes",
@@ -24,6 +30,7 @@ import androidx.room.PrimaryKey
         Index(value = ["is_synced"]),
         Index(value = ["presence"]),
         Index(value = ["kind"]),
+        Index(value = ["is_premium"]),
     ],
 )
 data class NodeEntity(
@@ -60,6 +67,18 @@ data class NodeEntity(
 
     @ColumnInfo(name = "tags")
     val tags: List<String>,
+
+    @ColumnInfo(name = "headline", defaultValue = "")
+    val headline: String = "",
+
+    @ColumnInfo(name = "bio", defaultValue = "")
+    val bio: String = "",
+
+    @ColumnInfo(name = "is_premium", defaultValue = "0")
+    val isPremium: Boolean = false,
+
+    @ColumnInfo(name = "premium_catalog")
+    val premiumCatalog: String? = null,
 
     @ColumnInfo(name = "is_favorite", defaultValue = "0")
     val isFavorite: Boolean = false,

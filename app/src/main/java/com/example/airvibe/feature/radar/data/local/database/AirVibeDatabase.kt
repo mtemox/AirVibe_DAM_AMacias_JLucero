@@ -11,10 +11,15 @@ import com.example.airvibe.feature.chat.data.local.dao.ChatDao
 import com.example.airvibe.feature.chat.data.local.dao.ProximityRoomDao
 import com.example.airvibe.feature.chat.data.local.entity.ChatMessageEntity
 import com.example.airvibe.feature.chat.data.local.entity.ProximityRoomEntity
+import com.example.airvibe.feature.chat.data.local.entity.RoomMemberEntity
 import com.example.airvibe.feature.chat.data.local.entity.RoomMessageEntity
+import com.example.airvibe.feature.radar.data.local.dao.HandshakeRequestDao
+import com.example.airvibe.feature.radar.data.local.dao.ProfileViewDao
 import com.example.airvibe.feature.radar.data.local.dao.RadarDao
 import com.example.airvibe.feature.radar.data.local.dao.SavedContactDao
+import com.example.airvibe.feature.radar.data.local.entity.HandshakeRequestEntity
 import com.example.airvibe.feature.radar.data.local.entity.NodeEntity
+import com.example.airvibe.feature.radar.data.local.entity.ProfileViewEntity
 import com.example.airvibe.feature.radar.data.local.entity.SavedContactEntity
 
 /**
@@ -32,6 +37,9 @@ import com.example.airvibe.feature.radar.data.local.entity.SavedContactEntity
         ChatMessageEntity::class,
         ProximityRoomEntity::class,
         RoomMessageEntity::class,
+        HandshakeRequestEntity::class,
+        RoomMemberEntity::class,
+        ProfileViewEntity::class,
     ],
     version = AirVibeDatabase.SCHEMA_VERSION,
     exportSchema = true,
@@ -43,10 +51,12 @@ abstract class AirVibeDatabase : RoomDatabase() {
     abstract fun savedContactDao(): SavedContactDao
     abstract fun chatDao(): ChatDao
     abstract fun proximityRoomDao(): ProximityRoomDao
+    abstract fun handshakeRequestDao(): HandshakeRequestDao
+    abstract fun profileViewDao(): ProfileViewDao
 
     companion object {
         const val DATABASE_NAME = "airvibe.db"
-        const val SCHEMA_VERSION = 6
+        const val SCHEMA_VERSION = 10
 
         @Volatile
         private var instance: AirVibeDatabase? = null
@@ -63,7 +73,17 @@ abstract class AirVibeDatabase : RoomDatabase() {
                 klass = AirVibeDatabase::class.java,
                 name = DATABASE_NAME,
             )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                .addMigrations(
+                    MIGRATION_1_2,
+                    MIGRATION_2_3,
+                    MIGRATION_3_4,
+                    MIGRATION_4_5,
+                    MIGRATION_5_6,
+                    MIGRATION_6_7,
+                    MIGRATION_7_8,
+                    MIGRATION_8_9,
+                    MIGRATION_9_10,
+                )
                 .fallbackToDestructiveMigration(dropAllTables = false)
                 .build()
         }
@@ -185,6 +205,131 @@ abstract class AirVibeDatabase : RoomDatabase() {
                 // is_own: set at write-time so messages remain correctly attributed after reinstall
                 db.execSQL(
                     "ALTER TABLE room_messages ADD COLUMN is_own INTEGER NOT NULL DEFAULT 0",
+                )
+            }
+        }
+
+        /**
+         * Feature 2 — Payload extendido (Premium).
+         * Añade columnas para headline, bio, is_premium y
+         * premium_catalog tanto en `radar_nodes` como en
+         * `saved_contacts`. Migración aditiva: no rompe filas
+         * existentes (todos los defaults son vacíos / FALSE).
+         */
+        private val MIGRATION_6_7: Migration = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE radar_nodes ADD COLUMN headline TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE radar_nodes ADD COLUMN bio TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE radar_nodes ADD COLUMN is_premium INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE radar_nodes ADD COLUMN premium_catalog TEXT")
+
+                db.execSQL("ALTER TABLE saved_contacts ADD COLUMN is_premium INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE saved_contacts ADD COLUMN premium_catalog TEXT")
+
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_radar_nodes_is_premium ON radar_nodes(is_premium)")
+            }
+        }
+
+        /**
+         * Feature 3 — Handshake (Conexión y Networking P2P).
+         * Crea la tabla `handshake_requests` para encolar
+         * solicitudes entrantes y salientes con su estado.
+         * Migración aditiva — no toca tablas previas.
+         */
+        private val MIGRATION_7_8: Migration = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS handshake_requests (
+                        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                        owner_id TEXT NOT NULL,
+                        handshake_id TEXT NOT NULL,
+                        peer_node_id TEXT NOT NULL,
+                        peer_display_name TEXT NOT NULL DEFAULT '',
+                        peer_headline TEXT NOT NULL DEFAULT '',
+                        peer_status TEXT NOT NULL DEFAULT '',
+                        peer_presence TEXT NOT NULL DEFAULT 'Online',
+                        peer_tags TEXT NOT NULL DEFAULT '',
+                        handshake_key TEXT NOT NULL,
+                        status TEXT NOT NULL DEFAULT 'Pending',
+                        direction TEXT NOT NULL DEFAULT 'Incoming',
+                        created_at INTEGER NOT NULL,
+                        responded_at INTEGER
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS index_handshake_requests_handshake_id ON handshake_requests(handshake_id)",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_handshake_requests_owner_id ON handshake_requests(owner_id)",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_handshake_requests_status ON handshake_requests(status)",
+                )
+            }
+        }
+
+        /**
+         * Feature 4 — Comunicación P2P (Salas de Proximidad).
+         * Crea la tabla `room_members` para mantener la lista
+         * activa de Guests por sala. Migración aditiva.
+         */
+        private val MIGRATION_8_9: Migration = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS room_members (
+                        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                        room_id TEXT NOT NULL,
+                        node_id TEXT NOT NULL,
+                        display_name TEXT NOT NULL DEFAULT '',
+                        role TEXT NOT NULL DEFAULT 'Guest',
+                        is_active INTEGER NOT NULL DEFAULT 1,
+                        joined_at INTEGER NOT NULL,
+                        last_seen_at INTEGER NOT NULL
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_room_members_room_id ON room_members(room_id)",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_room_members_node_id ON room_members(node_id)",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_room_members_active ON room_members(is_active)",
+                )
+            }
+        }
+
+        /**
+         * Feature 5 — Sincronización Diferida + Analíticas Premium.
+         * Crea la tabla `profile_views` (buffer local de eventos
+         * de telemetría antes de empujarlos a Supabase).
+         */
+        private val MIGRATION_9_10: Migration = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS profile_views (
+                        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                        target_user_id TEXT NOT NULL,
+                        source_node_id TEXT NOT NULL,
+                        kind TEXT NOT NULL DEFAULT 'View',
+                        created_at INTEGER NOT NULL,
+                        is_synced INTEGER NOT NULL DEFAULT 0
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_profile_views_target ON profile_views(target_user_id)",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_profile_views_synced ON profile_views(is_synced)",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_profile_views_created ON profile_views(created_at)",
                 )
             }
         }

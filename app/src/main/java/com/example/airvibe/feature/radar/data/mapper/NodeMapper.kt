@@ -29,6 +29,10 @@ object NodeMapper {
         signalStrength = signalStrength,
         accentColor = Color(accentColorArgb),
         tags = tags,
+        headline = headline,
+        bio = bio,
+        isPremium = isPremium,
+        premiumCatalog = premiumCatalog,
     )
 
     fun RadarNode.toEntity(
@@ -48,6 +52,10 @@ object NodeMapper {
         signalStrength = signalStrength,
         accentColorArgb = accentColor.toArgbSafe(),
         tags = tags,
+        headline = headline,
+        bio = bio,
+        isPremium = isPremium,
+        premiumCatalog = premiumCatalog,
         isFavorite = isFavorite,
         isSynced = isSynced,
         updatedAt = updatedAt,
@@ -57,14 +65,16 @@ object NodeMapper {
     fun NodeEntity.toProfile(distanceMeters: Int? = null): PersonProfile = PersonProfile(
         id = id,
         displayName = displayName,
-        headline = status,
-        bio = detail,
+        headline = headline.ifBlank { status },
+        bio = bio.ifBlank { detail },
         status = status,
         presence = presence.toPresenceStatus(),
         tags = tags,
         distanceMeters = distanceMeters ?: distanceMetersFor(distanceNormalized),
         isFavorite = isFavorite,
         accentHue = accentHueFrom(accentColorArgb),
+        isPremium = isPremium,
+        premiumCatalog = premiumCatalog,
     )
 
     private fun String.toNodeKind(): RadarNodeKind =
@@ -117,6 +127,10 @@ fun NodeEntity.toRemoteNode(): RemoteNode = RemoteNode(
     isFavorite = isFavorite,
     updatedAt = updatedAt,
     createdAt = createdAt,
+    headline = headline,
+    bio = bio,
+    isPremium = isPremium,
+    premiumCatalog = premiumCatalog,
 )
 
 /** Conversión inversa: remoto → entidad local (para pull-to-refresh). */
@@ -132,6 +146,10 @@ fun RemoteNode.toEntity(): NodeEntity = NodeEntity(
     signalStrength = signalStrength.toFloat(),
     accentColorArgb = accentColorArgb.toInt(),
     tags = tags,
+    headline = headline,
+    bio = bio,
+    isPremium = isPremium,
+    premiumCatalog = premiumCatalog,
     isFavorite = isFavorite,
     isSynced = true, // proviene de la nube
     updatedAt = updatedAt,
