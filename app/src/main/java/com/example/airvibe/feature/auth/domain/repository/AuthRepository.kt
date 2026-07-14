@@ -2,6 +2,7 @@ package com.example.airvibe.feature.auth.domain.repository
 
 import com.example.airvibe.feature.auth.domain.model.AuthStatus
 import com.example.airvibe.feature.auth.domain.model.AuthUser
+import com.example.airvibe.feature.auth.domain.model.SignUpOutcome
 import kotlinx.coroutines.flow.StateFlow
 
 /**
@@ -23,8 +24,8 @@ interface AuthRepository {
      */
     suspend fun signIn(email: String, password: String): Result<AuthUser>
 
-    /** Registra un usuario nuevo y lo deja autenticado. */
-    suspend fun signUp(email: String, password: String, displayName: String?): Result<AuthUser>
+    /** Registra un usuario nuevo. Puede requerir confirmación por correo. */
+    suspend fun signUp(email: String, password: String, displayName: String?): Result<SignUpOutcome>
 
     /** Cierra la sesión actual. */
     suspend fun signOut(): Result<Unit>

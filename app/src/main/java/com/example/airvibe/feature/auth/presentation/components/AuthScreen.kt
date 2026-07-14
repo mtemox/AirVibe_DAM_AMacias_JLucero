@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Bolt
+import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Mail
@@ -200,6 +201,20 @@ fun AuthScreenContent(
                 }
 
                 AnimatedVisibility(
+                    visible = state.infoMessage != null,
+                    enter = fadeIn(),
+                    exit = fadeOut(),
+                ) {
+                    Column {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        InfoBanner(
+                            message = state.infoMessage.orEmpty(),
+                            onDismiss = { onEvent(AuthUiEvent.DismissInfo) },
+                        )
+                    }
+                }
+
+                AnimatedVisibility(
                     visible = state.errorMessage != null,
                     enter = fadeIn(),
                     exit = fadeOut(),
@@ -316,6 +331,44 @@ private fun FluidTextField(
         ),
         modifier = Modifier.fillMaxWidth()
     )
+}
+
+@Composable
+private fun InfoBanner(
+    message: String,
+    onDismiss: () -> Unit,
+) {
+    val shape = RoundedCornerShape(12.dp)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.primaryContainer)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = Icons.Rounded.CheckCircle,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+            modifier = Modifier.size(16.dp),
+        )
+        Spacer(modifier = Modifier.width(10.dp))
+        Text(
+            text = message,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onPrimaryContainer,
+            modifier = Modifier.weight(1f),
+        )
+        Icon(
+            imageVector = Icons.Rounded.Close,
+            contentDescription = "Cerrar",
+            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+            modifier = Modifier
+                .size(16.dp)
+                .clickable(onClick = onDismiss),
+        )
+    }
 }
 
 @Composable

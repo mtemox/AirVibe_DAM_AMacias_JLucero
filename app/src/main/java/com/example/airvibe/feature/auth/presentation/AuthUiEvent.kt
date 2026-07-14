@@ -11,4 +11,5 @@ sealed interface AuthUiEvent {
     data object Submit : AuthUiEvent
     data object SignOut : AuthUiEvent
     data object DismissError : AuthUiEvent
+    data object DismissInfo : AuthUiEvent
 }

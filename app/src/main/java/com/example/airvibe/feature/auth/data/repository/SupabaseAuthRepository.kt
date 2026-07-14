@@ -1,8 +1,10 @@
 package com.example.airvibe.feature.auth.data.repository
 
+import com.example.airvibe.core.network.SupabaseConfig
 import com.example.airvibe.feature.auth.data.dto.toDomain
 import com.example.airvibe.feature.auth.domain.model.AuthStatus
 import com.example.airvibe.feature.auth.domain.model.AuthUser
+import com.example.airvibe.feature.auth.domain.model.SignUpOutcome
 import com.example.airvibe.feature.auth.domain.repository.AuthRepository
 import com.example.airvibe.feature.radar.data.sync.SyncScheduler
 import io.github.jan.supabase.SupabaseClient
@@ -74,20 +76,29 @@ class SupabaseAuthRepository(
         email: String,
         password: String,
         displayName: String?,
-    ): Result<AuthUser> = runCatching {
+    ): Result<SignUpOutcome> = runCatching {
         val metadata = buildMap {
             if (!displayName.isNullOrBlank()) put("display_name", displayName)
         }.takeIf { it.isNotEmpty() }
             ?.let { entries -> JsonObject(entries.mapValues { JsonPrimitive(it.value) }) }
 
-        supabase.auth.signUpWith(Email) {
+        supabase.auth.signUpWith(
+            provider = Email,
+            redirectUrl = SupabaseConfig.EMAIL_CONFIRM_REDIRECT_URL,
+        ) {
             this.email = email
             this.password = password
             if (metadata != null) {
                 this.data = metadata
             }
         }
-        currentUserOrNull() ?: error("Registro sin usuario activo")
+
+        val user = currentUserOrNull()
+        if (user != null) {
+            SignUpOutcome.SignedIn(user)
+        } else {
+            SignUpOutcome.ConfirmationRequired(email.trim())
+        }
     }.recoverCatching { throwable ->
         throw throwable.toAuthException()
     }
@@ -129,6 +140,8 @@ class SupabaseAuthRepository(
         val friendly = when {
             "invalid login" in message || "invalid_grant" in message ->
                 "Email o contraseña incorrectos."
+            "email not confirmed" in message ->
+                "Confirma tu correo antes de iniciar sesión. Revisa tu bandeja de entrada."
             "user already registered" in message ->
                 "Este email ya está registrado. Inicia sesión."
             "password" in message && "at least" in message ->

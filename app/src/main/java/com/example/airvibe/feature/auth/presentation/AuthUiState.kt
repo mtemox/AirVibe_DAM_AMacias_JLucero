@@ -14,6 +14,7 @@ data class AuthUiState(
     val displayName: String = "",
     val isSubmitting: Boolean = false,
     val errorMessage: String? = null,
+    val infoMessage: String? = null,
     val currentUser: AuthUser? = null,
 ) {
     val canSubmit: Boolean

@@ -49,4 +49,8 @@ object SupabaseConfig {
      * ```
      */
     const val RADAR_NODES_TABLE: String = "radar_nodes"
+
+    /** Landing page tras confirmar correo (Vercel). Debe coincidir con Site URL en Supabase. */
+    const val EMAIL_CONFIRM_REDIRECT_URL: String =
+        "https://airvibe.vercel.app/auth/confirm/"
 }
