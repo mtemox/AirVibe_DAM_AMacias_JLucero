@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Confirmación de correo — AirVibe" />
+  <title>AirVibe — Verificación de correo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --blue-deep: #305cde;
+      --blue-primary: #6366f1;
+      --blue-soft: #9cb0ff;
+      --coral: #ff6868;
+      --orange: #ffa84d;
+      --yellow: #ffde21;
+      --slate-900: #0f172a;
+      --slate-600: #475569;
+      --slate-400: #94a3b8;
+      --white: #ffffff;
+      --success: #10b981;
+      --error: #e11d48;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: "Inter", system-ui, -apple-system, sans-serif;
+      background: var(--white);
+      color: var(--slate-900);
+      min-height: 100dvh;
+      overflow-x: hidden;
+    }
+
+    /* ── Wave header ── */
+    .header {
+      position: relative;
+      width: 100%;
+      height: 280px;
+      overflow: hidden;
+    }
+
+    .header svg {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .header-content {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      padding: 28px 24px 0;
+    }
+
+    .brand {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: var(--white);
+      letter-spacing: -0.02em;
+    }
+
+    /* ── Main ── */
+    .main {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 0 24px 48px;
+      margin-top: -48px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .icon-ring {
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      background: linear-gradient(145deg, #eef2ff 0%, #e0e7ff 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 28px;
+      box-shadow: 0 8px 32px rgba(99, 102, 241, 0.15);
+    }
+
+    .icon-ring svg {
+      width: 56px;
+      height: 56px;
+    }
+
+    .icon-ring.success svg { color: var(--success); }
+    .icon-ring.error svg { color: var(--error); }
+    .icon-ring.pending svg { color: var(--blue-primary); }
+
+    .title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      text-align: center;
+      margin-bottom: 12px;
+      letter-spacing: -0.02em;
+      line-height: 1.25;
+    }
+
+    .description {
+      font-size: 1rem;
+      line-height: 1.6;
+      color: var(--slate-600);
+      text-align: center;
+      max-width: 340px;
+      margin-bottom: 32px;
+    }
+
+    .card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      padding: 20px 24px;
+      max-width: 360px;
+      width: 100%;
+      margin-bottom: 28px;
+    }
+
+    .card-step {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .card-step:last-child { margin-bottom: 0; }
+
+    .step-num {
+      flex-shrink: 0;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--blue-primary);
+      color: var(--white);
+      font-size: 0.8125rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .step-text {
+      font-size: 0.9375rem;
+      color: var(--slate-600);
+      line-height: 1.45;
+      padding-top: 3px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 14px 28px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, var(--blue-deep) 0%, var(--blue-primary) 100%);
+      color: var(--white);
+      font-size: 1rem;
+      font-weight: 600;
+      text-decoration: none;
+      border: none;
+      cursor: default;
+      box-shadow: 0 4px 16px rgba(48, 92, 222, 0.35);
+    }
+
+    .footer-note {
+      margin-top: 24px;
+      font-size: 0.8125rem;
+      color: var(--slate-400);
+      text-align: center;
+      max-width: 320px;
+    }
+
+    .hidden { display: none !important; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.7; transform: scale(0.96); }
+    }
+
+    .icon-ring.pending {
+      animation: pulse 1.8s ease-in-out infinite;
+    }
+
+    @media (min-width: 480px) {
+      .header { height: 320px; }
+      .title { font-size: 1.75rem; }
+    }
+  </style>
+</head>
+<body>
+  <header class="header" aria-hidden="true">
+    <svg viewBox="0 0 400 320" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="waveGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stop-color="#305cde"/>
+          <stop offset="45%" stop-color="#305cde"/>
+          <stop offset="65%" stop-color="#ff6868"/>
+          <stop offset="85%" stop-color="#ffa84d"/>
+          <stop offset="100%" stop-color="#ffde21"/>
+        </linearGradient>
+        <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+          <path d="M0 20 Q20 0 40 20 T80 20" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="2"/>
+        </pattern>
+      </defs>
+      <rect width="400" height="320" fill="url(#waveGrad)"/>
+      <rect width="400" height="320" fill="url(#grid)" opacity="0.6"/>
+      <path fill="url(#waveGrad)" d="M0,0 L400,0 L400,224 Q300,380 80,304 Q0,280 0,304 Z"/>
+    </svg>
+    <div class="header-content">
+      <span class="brand">AirVibe</span>
+    </div>
+  </header>
+
+  <main class="main">
+    <!-- Estado: verificando -->
+    <section id="state-pending" class="state">
+      <div class="icon-ring pending">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+          <polyline points="22,6 12,13 2,6"/>
+        </svg>
+      </div>
+      <h1 class="title">Verificando tu correo…</h1>
+      <p class="description">Un momento mientras confirmamos tu cuenta.</p>
+    </section>
+
+    <!-- Estado: éxito -->
+    <section id="state-success" class="state hidden">
+      <div class="icon-ring success">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+          <polyline points="22 4 12 14.01 9 11.01"/>
+        </svg>
+      </div>
+      <h1 class="title">¡Correo verificado!</h1>
+      <p class="description">
+        Tu cuenta está lista. Ya puedes usar AirVibe con tu email y contraseña.
+      </p>
+      <div class="card">
+        <div class="card-step">
+          <span class="step-num">1</span>
+          <span class="step-text">Abre la app <strong>AirVibe</strong> en tu teléfono</span>
+        </div>
+        <div class="card-step">
+          <span class="step-num">2</span>
+          <span class="step-text">Pulsa <strong>Iniciar sesión</strong></span>
+        </div>
+        <div class="card-step">
+          <span class="step-num">3</span>
+          <span class="step-text">Ingresa el email y la contraseña que registraste</span>
+        </div>
+      </div>
+      <span class="pill" role="status">Listo para conectar</span>
+      <p class="footer-note">Puedes cerrar esta pestaña y volver a la app.</p>
+    </section>
+
+    <!-- Estado: error -->
+    <section id="state-error" class="state hidden">
+      <div class="icon-ring error">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8" x2="12" y2="12"/>
+          <line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+      </div>
+      <h1 class="title">No se pudo verificar</h1>
+      <p class="description" id="error-message">
+        El enlace puede haber expirado o ya fue usado. Solicita un nuevo correo de confirmación desde la app.
+      </p>
+      <p class="footer-note">Si el problema continúa, contacta al equipo de AirVibe.</p>
+    </section>
+  </main>
+
+  <script>
+    (function () {
+      function parseParams() {
+        var hash = window.location.hash.replace(/^#/, "");
+        var search = window.location.search.replace(/^\?/, "");
+        var params = new URLSearchParams(hash || search);
+        return {
+          access_token: params.get("access_token"),
+          type: params.get("type"),
+          error: params.get("error"),
+          error_description: params.get("error_description"),
+        };
+      }
+
+      function show(id) {
+        document.querySelectorAll(".state").forEach(function (el) {
+          el.classList.add("hidden");
+        });
+        var target = document.getElementById(id);
+        if (target) target.classList.remove("hidden");
+      }
+
+      function init() {
+        var p = parseParams();
+
+        if (p.error) {
+          var msg = document.getElementById("error-message");
+          if (msg && p.error_description) {
+            msg.textContent = decodeURIComponent(p.error_description.replace(/\+/g, " "));
+          }
+          show("state-error");
+          return;
+        }
+
+        if (p.access_token || p.type === "signup" || p.type === "email_change" || p.type === "recovery") {
+          show("state-success");
+          return;
+        }
+
+        // Sin tokens en URL: Supabase ya verificó en servidor y redirigió limpio,
+        // o el usuario abrió la página directamente tras confirmar.
+        setTimeout(function () {
+          show("state-success");
+        }, 600);
+      }
+
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", init);
+      } else {
+        init();
+      }
+    })();
+  </script>
+</body>
+</html>
