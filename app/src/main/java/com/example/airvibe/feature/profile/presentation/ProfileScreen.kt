@@ -66,6 +66,11 @@ import com.example.airvibe.core.designsystem.modifiers.glassShadow
 import com.example.airvibe.core.designsystem.theme.AirVibeTheme
 import com.example.airvibe.core.ui.feedback.rememberUserMessages
 import android.app.Application
+import androidx.compose.material.icons.rounded.WorkspacePremium
+import com.example.airvibe.core.di.ServiceLocator
+import com.example.airvibe.feature.profile.presentation.components.PremiumUpgradeSheet
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
 
 @Composable
 private fun profileViewModel(): ProfileViewModel {
@@ -91,8 +96,16 @@ fun ProfileScreen(
 
     var isEditSheetVisible by remember { mutableStateOf(false) }
     var isThemeSheetVisible by remember { mutableStateOf(false) }
+    var isPremiumSheetVisible by remember { mutableStateOf(false) }
     val editSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val themeSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val premiumSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    val premiumRepository = remember { ServiceLocator.premiumRepository }
+    val hasEntitlement by premiumRepository.observeEntitlement().collectAsStateWithLifecycle(initialValue = premiumRepository.hasEntitlement())
+    var isPurchasing by remember { mutableStateOf(false) }
+    var purchaseError by remember { mutableStateOf<String?>(null) }
+    val coroutineScope = rememberCoroutineScope()
 
     val (snackbarHostState, snackbarFlow) = rememberUserMessages()
 
@@ -315,13 +328,22 @@ fun ProfileScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
 
+            // Premium upgrade banner (solo si no tiene entitlement)
+            if (!hasEntitlement) {
+                PremiumUpgradeBanner(
+                    onClick = { isPremiumSheetVisible = true },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(modifier = Modifier.height(20.dp))
+            }
+
             // Stats Bento
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                StatCard(value = stats.trips.toString(), label = "Viajes", modifier = Modifier.weight(1f))
-                StatCard(value = stats.rating.toString(), label = "Calificación", modifier = Modifier.weight(1f))
+                StatCard(value = stats.conversations.toString(), label = "Chats", modifier = Modifier.weight(1f))
+                StatCard(value = stats.activeRooms.toString(), label = "Salas", modifier = Modifier.weight(1f))
                 StatCard(value = stats.friends.toString(), label = "Amigos", modifier = Modifier.weight(1f))
             }
 
@@ -413,6 +435,11 @@ fun ProfileScreen(
                     isEditSheetVisible = false
                 },
                 onDismiss = { if (!isUpdating) isEditSheetVisible = false },
+                hasEntitlement = hasEntitlement,
+                onOpenPremiumUpgrade = {
+                    isEditSheetVisible = false
+                    isPremiumSheetVisible = true
+                },
                 modifier = Modifier
                     .clip(sheetShape)
                     .background(
@@ -446,6 +473,47 @@ fun ProfileScreen(
                     viewModel.updateTheme(theme)
                     isThemeSheetVisible = false
                 }
+            )
+        }
+    }
+
+    if (isPremiumSheetVisible) {
+        ModalBottomSheet(
+            onDismissRequest = {
+                if (!isPurchasing) {
+                    isPremiumSheetVisible = false
+                    purchaseError = null
+                }
+            },
+            sheetState = premiumSheetState,
+            containerColor = MaterialTheme.colorScheme.surface,
+            scrimColor = Color.Black.copy(alpha = 0.45f),
+        ) {
+            PremiumUpgradeSheet(
+                onPurchase = { catalog ->
+                    coroutineScope.launch {
+                        isPurchasing = true
+                        purchaseError = null
+                        premiumRepository.purchasePremium(catalog)
+                            .onSuccess {
+                                isPurchasing = false
+                                isPremiumSheetVisible = false
+                                viewModel.refreshVisibility()
+                            }
+                            .onFailure { e ->
+                                isPurchasing = false
+                                purchaseError = e.message ?: "Error al procesar la compra"
+                            }
+                    }
+                },
+                onDismiss = {
+                    if (!isPurchasing) {
+                        isPremiumSheetVisible = false
+                        purchaseError = null
+                    }
+                },
+                isLoading = isPurchasing,
+                errorMessage = purchaseError,
             )
         }
     }
@@ -597,10 +665,10 @@ private fun PremiumVisibilityCard(
                         color = MaterialTheme.colorScheme.onBackground,
                     )
                     Text(
-                        text = if (state.isPremium) {
-                            "Tu perfil en el radar de los demás"
-                        } else {
-                            "Inicia sesión para ver tu alcance"
+                        text = when {
+                            state.isPremium -> "Tu perfil en el radar de los demás"
+                            state.hasEntitlement -> "Activa Modo Premium para ver analíticas"
+                            else -> "Obtén Premium para ver tu alcance"
                         },
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -690,6 +758,71 @@ private fun VisibilityStatTile(
             text = title,
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+private val PremiumGold = Color(0xFFFFD700)
+private val PremiumGoldDark = Color(0xFFB8860B)
+
+@Composable
+private fun PremiumUpgradeBanner(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(
+                brush = Brush.horizontalGradient(
+                    colors = listOf(
+                        PremiumGold.copy(alpha = 0.15f),
+                        PremiumGoldDark.copy(alpha = 0.1f),
+                    ),
+                ),
+            )
+            .border(
+                width = 1.dp,
+                color = PremiumGold.copy(alpha = 0.4f),
+                shape = RoundedCornerShape(16.dp),
+            )
+            .clickable(onClick = onClick)
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .clip(CircleShape)
+                .background(PremiumGold.copy(alpha = 0.2f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.WorkspacePremium,
+                contentDescription = null,
+                tint = PremiumGoldDark,
+                modifier = Modifier.size(26.dp),
+            )
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "Hazte Premium",
+                style = MaterialTheme.typography.titleSmall.copy(
+                    fontWeight = FontWeight.Bold,
+                ),
+                color = MaterialTheme.colorScheme.onBackground,
+            )
+            Text(
+                text = "Destaca en el radar y muestra tus servicios",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Icon(
+            imageVector = Icons.Rounded.ChevronRight,
+            contentDescription = "Abrir",
+            tint = PremiumGoldDark,
         )
     }
 }

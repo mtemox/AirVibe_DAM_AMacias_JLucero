@@ -25,9 +25,10 @@ data class RemoteProfileViewDto(
     @SerialName("created_at") val createdAt: String? = null,
 )
 
-fun ProfileViewEntity.toRemoteDto(): RemoteProfileViewDto = RemoteProfileViewDto(
+fun ProfileViewEntity.toRemoteDto(ownerId: String? = null): RemoteProfileViewDto = RemoteProfileViewDto(
     targetUserId = targetUserId,
     sourceNodeId = sourceNodeId,
+    ownerId = ownerId,
     kind = kind,
     createdAt = createdAt.toIsoTimestamp(),
 )

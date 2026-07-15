@@ -54,6 +54,8 @@ fun OwnProfileSheet(
     profile: ScannerProfile,
     onSave: (OwnProfileDraft) -> Unit,
     onDismiss: () -> Unit,
+    hasEntitlement: Boolean = false,
+    onOpenPremiumUpgrade: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var displayName by remember(profile.id) { mutableStateOf(profile.displayName) }
@@ -297,11 +299,21 @@ fun OwnProfileSheet(
                         HorizontalDivider(color = borderColor, thickness = 1.dp, modifier = Modifier.padding(horizontal = 16.dp))
                         GroupedListItem(
                             title = "Modo Premium",
-                            subtitle = if (isPremium) "Activado" else "Desactivado",
+                            subtitle = when {
+                                !hasEntitlement -> "Obtener Premium"
+                                isPremium -> "Activado"
+                                else -> "Desactivado"
+                            },
                             icon = Icons.Rounded.WorkspacePremium,
-                            iconBg = Color(0xFFFFF0B3),
-                            iconTint = Color(0xFF7A5C00),
-                            onClick = { isPremium = !isPremium }
+                            iconBg = if (hasEntitlement && isPremium) Color(0xFFFFD700).copy(alpha = 0.3f) else Color(0xFFFFF0B3),
+                            iconTint = if (hasEntitlement && isPremium) Color(0xFFB8860B) else Color(0xFF7A5C00),
+                            onClick = {
+                                if (hasEntitlement) {
+                                    isPremium = !isPremium
+                                } else {
+                                    onOpenPremiumUpgrade()
+                                }
+                            }
                         )
                     }
                 }
