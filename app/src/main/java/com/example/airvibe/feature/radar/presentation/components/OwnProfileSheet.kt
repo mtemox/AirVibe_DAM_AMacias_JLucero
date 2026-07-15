@@ -20,6 +20,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import android.net.Uri
+import coil.compose.AsyncImage
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.FileProvider
+import androidx.core.content.ContextCompat
+import android.Manifest
+import android.content.pm.PackageManager
+import java.io.File
 import com.example.airvibe.feature.radar.domain.model.PresenceStatus
 import com.example.airvibe.feature.radar.domain.model.RadarNodeKind
 import com.example.airvibe.feature.radar.domain.scanner.ScannerProfile
@@ -34,6 +45,7 @@ data class OwnProfileDraft(
     val bio: String = "",
     val isPremium: Boolean = false,
     val premiumCatalog: String? = null,
+    val avatarUri: Uri? = null,
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -53,6 +65,52 @@ fun OwnProfileSheet(
     var bio by remember(profile.id) { mutableStateOf(profile.bio) }
     var isPremium by remember(profile.id) { mutableStateOf(profile.isPremium) }
     var premiumCatalog by remember(profile.id) { mutableStateOf(profile.premiumCatalog.orEmpty()) }
+    var selectedAvatarUri by remember { mutableStateOf<Uri?>(null) }
+    var showImageSourceDialog by remember { mutableStateOf(false) }
+    var tempCameraUri by remember { mutableStateOf<Uri?>(null) }
+    
+    val context = LocalContext.current
+    
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia(),
+        onResult = { uri ->
+            if (uri != null) {
+                selectedAvatarUri = uri
+            }
+        }
+    )
+
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture(),
+        onResult = { success ->
+            if (success && tempCameraUri != null) {
+                selectedAvatarUri = tempCameraUri
+            }
+        }
+    )
+
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+        onResult = { isGranted ->
+            if (isGranted) {
+                val tempFile = File.createTempFile("avatar_", ".jpg", context.cacheDir)
+                val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", tempFile)
+                tempCameraUri = uri
+                cameraLauncher.launch(uri)
+            }
+        }
+    )
+
+    fun launchCamera() {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+            val tempFile = File.createTempFile("avatar_", ".jpg", context.cacheDir)
+            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", tempFile)
+            tempCameraUri = uri
+            cameraLauncher.launch(uri)
+        } else {
+            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+        }
+    }
 
     // Colores Vibe Pure
     val surfaceColor = Color(0xFFFFFFFF)
@@ -102,6 +160,7 @@ fun OwnProfileSheet(
                             bio = bio,
                             isPremium = isPremium,
                             premiumCatalog = premiumCatalog.takeIf { isPremium && it.isNotBlank() },
+                            avatarUri = selectedAvatarUri,
                         )
                     )
                 },
@@ -126,14 +185,27 @@ fun OwnProfileSheet(
                                 .fillMaxSize()
                                 .clip(CircleShape)
                                 .background(MaterialTheme.colorScheme.primaryContainer)
-                                .border(4.dp, Color(0xFFEEEEEE), CircleShape),
+                                .border(4.dp, Color(0xFFEEEEEE), CircleShape)
+                                .clickable {
+                                    showImageSourceDialog = true
+                                },
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(
-                                text = displayName.take(2).uppercase(),
-                                style = MaterialTheme.typography.displayMedium,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
+                            val imageToLoad = selectedAvatarUri ?: profile.avatarUrl ?: profile.avatarBase64
+                            if (imageToLoad != null) {
+                                AsyncImage(
+                                    model = imageToLoad,
+                                    contentDescription = "Avatar",
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            } else {
+                                Text(
+                                    text = displayName.take(2).uppercase(),
+                                    style = MaterialTheme.typography.displayMedium,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
                         }
                         Box(
                             modifier = Modifier
@@ -142,7 +214,9 @@ fun OwnProfileSheet(
                                 .size(36.dp)
                                 .clip(CircleShape)
                                 .background(MaterialTheme.colorScheme.primary)
-                                .clickable { },
+                                .clickable {
+                                    showImageSourceDialog = true
+                                },
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(imageVector = Icons.Rounded.PhotoCamera, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
@@ -254,6 +328,34 @@ fun OwnProfileSheet(
                 Spacer(modifier = Modifier.height(32.dp))
             }
         }
+    }
+
+    if (showImageSourceDialog) {
+        AlertDialog(
+            onDismissRequest = { showImageSourceDialog = false },
+            title = { Text("Foto de Perfil") },
+            text = { Text("¿Desde dónde quieres obtener la imagen?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showImageSourceDialog = false
+                    photoPickerLauncher.launch(
+                        androidx.activity.result.PickVisualMediaRequest(
+                            ActivityResultContracts.PickVisualMedia.ImageOnly
+                        )
+                    )
+                }) {
+                    Text("Galería")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showImageSourceDialog = false
+                    launchCamera()
+                }) {
+                    Text("Cámara")
+                }
+            }
+        )
     }
 }
 

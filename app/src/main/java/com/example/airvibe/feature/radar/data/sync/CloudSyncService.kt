@@ -77,7 +77,7 @@ class CloudSyncService(
     private suspend fun restoreRooms(ownerId: String) {
         val remote = roomRemote.fetchAll(ownerId).getOrNull() ?: return
         remote.forEach { dto ->
-            val local = roomDao.getRoom(dto.id)
+            val local = roomDao.getRoomIncludingDeleted(dto.id)
             if (local == null || local.isSynced) {
                 roomDao.upsertRoom(dto.toEntity())
             }
@@ -110,6 +110,14 @@ class CloudSyncService(
     }
 
     private suspend fun pushRooms(ownerId: String) {
+        val deletions = roomDao.getPendingDeletions()
+        deletions.forEach { entity ->
+            val result = roomRemote.delete(entity.id, ownerId)
+            if (result.isSuccess) {
+                roomDao.hardDeleteRoom(entity.id)
+            }
+        }
+
         val pending = roomDao.getPendingRooms()
         if (pending.isEmpty()) return
         val dtos = pending.map { it.toRemoteDto(ownerId) }

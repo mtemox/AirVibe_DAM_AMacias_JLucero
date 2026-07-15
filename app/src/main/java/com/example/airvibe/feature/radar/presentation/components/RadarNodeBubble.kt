@@ -135,6 +135,7 @@ fun BoxScope.RadarNodeBubble(
                     accentBrush = Brush.linearGradient(
                         colors = listOf(token.accent, token.accent.copy(alpha = 0.7f)),
                     ),
+                    imageModel = node.avatarBase64
                 )
             }
 
@@ -241,6 +242,7 @@ fun BoxScope.RadarNodeBubble(
                                     accentBrush = Brush.linearGradient(
                                         colors = listOf(token.accent, token.accent.copy(alpha = 0.7f)),
                                     ),
+                                    imageModel = node.avatarBase64
                                 )
                                 Column {
                                     Text(
@@ -304,7 +306,7 @@ fun BoxScope.RadarNodeBubble(
                                         )
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Text(
-                                            text = "~${meters}m • ${if(node.signalStrength > 0.6) "Strong" else "Weak"}",
+                                            text = "~${meters}m • ${if(node.signalStrength > 0.6) "Fuerte" else "Débil"}",
                                             style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
@@ -325,10 +327,10 @@ fun BoxScope.RadarNodeBubble(
                                 ) {
                                     Icon(
                                         imageVector = Icons.Outlined.ChatBubbleOutline,
-                                        contentDescription = "Message",
+                                        contentDescription = "Mensaje",
                                         modifier = Modifier.size(18.dp)
                                     )
-                                    Text("Message", style = MaterialTheme.typography.labelMedium.copy(fontSize = 14.sp))
+                                    Text("Mensaje", style = MaterialTheme.typography.labelMedium.copy(fontSize = 14.sp))
                                 }
                             }
                         }

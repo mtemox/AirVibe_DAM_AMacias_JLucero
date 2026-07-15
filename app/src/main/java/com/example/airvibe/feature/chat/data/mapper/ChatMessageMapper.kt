@@ -48,6 +48,7 @@ object ChatMessageMapper {
         lastTimestamp = lastTimestamp,
         unreadCount = unreadCount,
         isGroupInvite = kind.equals(MessageKind.GroupInvite.name, ignoreCase = true),
+        avatarBase64 = avatarBase64,
     )
 
     private fun String.toDirection(): MessageDirection =

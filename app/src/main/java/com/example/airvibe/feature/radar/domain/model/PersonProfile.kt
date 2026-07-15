@@ -24,6 +24,8 @@ data class PersonProfile(
     val accentHue: Float,
     val isPremium: Boolean = false,
     val premiumCatalog: String? = null,
+    val avatarUrl: String? = null,
+    val avatarBase64: String? = null,
 ) {
     companion object {
         fun fromNode(node: RadarNode, distanceMeters: Int = 120): PersonProfile = PersonProfile(
@@ -39,6 +41,8 @@ data class PersonProfile(
             accentHue = 0f,
             isPremium = node.isPremium,
             premiumCatalog = node.premiumCatalog,
+            avatarUrl = node.avatarUrl,
+            avatarBase64 = node.avatarBase64,
         )
     }
 }

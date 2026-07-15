@@ -63,6 +63,7 @@ import com.example.airvibe.R
 import com.example.airvibe.core.designsystem.modifiers.glassBlur
 import com.example.airvibe.core.designsystem.modifiers.glassShadow
 import com.example.airvibe.core.designsystem.theme.AirVibeTheme
+import com.example.airvibe.core.ui.feedback.rememberUserMessages
 import com.example.airvibe.feature.chat.domain.model.ProximityRoom
 import com.example.airvibe.feature.chat.presentation.RoomsListViewModel
 import com.example.airvibe.feature.radar.presentation.components.BroadcastSheet
@@ -101,11 +102,16 @@ fun GroupsScreen(
     var isCreateSheetVisible by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
+    val (snackbarHostState, snackbarFlow) = rememberUserMessages()
+
     LaunchedEffect(newRoomId) {
         val id = newRoomId
         if (!id.isNullOrBlank()) {
             viewModel.consumeNewRoomId()
             isCreateSheetVisible = false
+            // Pequeño delay para que el snackbar de "Sala creada"
+            // sea visible antes de cambiar de pantalla.
+            kotlinx.coroutines.delay(450)
             onOpenRoom(id)
         }
     }
@@ -118,10 +124,11 @@ fun GroupsScreen(
                 contentColor = Color.White,
                 shape = RoundedCornerShape(16.dp)
             ) {
-                Icon(imageVector = Icons.Rounded.Add, contentDescription = "Add")
+                Icon(imageVector = Icons.Rounded.Add, contentDescription = "Agregar")
             }
         }
     ) { paddingValues ->
+        Box(modifier = Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -137,7 +144,7 @@ fun GroupsScreen(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 IconButton(onClick = { /* TODO */ }) {
-                    Icon(imageVector = Icons.Rounded.Menu, contentDescription = "Menu", tint = MaterialTheme.colorScheme.primary)
+                    Icon(imageVector = Icons.Rounded.Menu, contentDescription = "Menú", tint = MaterialTheme.colorScheme.primary)
                 }
                 Text(
                     text = "AirVibe",
@@ -148,7 +155,7 @@ fun GroupsScreen(
                     )
                 )
                 IconButton(onClick = { /* TODO */ }) {
-                    Icon(imageVector = Icons.Rounded.Settings, contentDescription = "Settings", tint = MaterialTheme.colorScheme.primary)
+                    Icon(imageVector = Icons.Rounded.Settings, contentDescription = "Ajustes", tint = MaterialTheme.colorScheme.primary)
                 }
             }
 
@@ -157,8 +164,8 @@ fun GroupsScreen(
                 OutlinedTextField(
                     value = searchQuery,
                     onValueChange = { searchQuery = it },
-                    placeholder = { Text("Search groups or ask Meta AI") },
-                    leadingIcon = { Icon(imageVector = Icons.Rounded.Search, contentDescription = "Search", tint = MaterialTheme.colorScheme.outline) },
+                    placeholder = { Text("Busca grupos o pregunta a Meta AI") },
+                    leadingIcon = { Icon(imageVector = Icons.Rounded.Search, contentDescription = "Buscar", tint = MaterialTheme.colorScheme.outline) },
                     modifier = Modifier.fillMaxWidth(),
                     shape = CircleShape,
                     colors = OutlinedTextFieldDefaults.colors(
@@ -238,7 +245,7 @@ fun GroupsScreen(
                                 }
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(imageVector = Icons.Rounded.Group, contentDescription = "Members", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                                    Icon(imageVector = Icons.Rounded.Group, contentDescription = "Miembros", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text(
                                         text = group.members,
@@ -263,6 +270,15 @@ fun GroupsScreen(
                     }
                 }
             }
+        }
+
+        rememberUserMessages(
+            flow = snackbarFlow,
+            host = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 88.dp),
+        )
         }
     }
 
@@ -332,7 +348,7 @@ private fun Long.toGroupTimestamp(): String {
 
     return when {
         sameDay -> SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(this))
-        sameYesterday -> "Yesterday"
+        sameYesterday -> "Ayer"
         sameYear -> SimpleDateFormat("MMM d", Locale.getDefault()).format(Date(this))
         else -> SimpleDateFormat("MM/dd/yy", Locale.getDefault()).format(Date(this))
     }

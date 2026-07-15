@@ -124,7 +124,7 @@ fun PermissionsScreen(
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "Security & Access",
+                            text = "Seguridad y acceso",
                             style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -135,7 +135,7 @@ fun PermissionsScreen(
 
                 // Heading Section
                 Text(
-                    text = "App Permissions",
+                    text = "Permisos de la app",
                     style = MaterialTheme.typography.headlineLarge.copy(
                         fontWeight = FontWeight.Normal,
                         fontSize = 32.sp
@@ -144,7 +144,7 @@ fun PermissionsScreen(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "To provide the best offline experience, AirVibe requires the following access:",
+                    text = "Para ofrecerte la mejor experiencia sin conexión, AirVibe necesita los siguientes accesos:",
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -160,7 +160,7 @@ fun PermissionsScreen(
 
                 PermissionToggleCard(
                     title = "Bluetooth",
-                    description = "Used to create the local mesh network with nearby peers, allowing you to communicate without cellular data.",
+                    description = "Se usa para crear la red mesh local con peers cercanos, permitiéndote comunicarte sin datos móviles.",
                     icon = Icons.Rounded.Bluetooth,
                     iconTint = MaterialTheme.colorScheme.primaryContainer,
                     iconBg = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.1f),
@@ -174,8 +174,8 @@ fun PermissionsScreen(
                 }
 
                 PermissionToggleCard(
-                    title = "Location",
-                    description = "Needed to scan for nearby devices and optimize node connections within your specific vicinity.",
+                    title = "Ubicación",
+                    description = "Necesaria para escanear dispositivos cercanos y optimizar las conexiones dentro de tu zona.",
                     icon = Icons.Rounded.LocationOn,
                     iconTint = MaterialTheme.colorScheme.secondary,
                     iconBg = MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f),
@@ -189,8 +189,8 @@ fun PermissionsScreen(
                 }
 
                 PermissionToggleCard(
-                    title = "Notifications",
-                    description = "Alerts you when a peer is nearby or when you receive offline messages through the mesh network.",
+                    title = "Notificaciones",
+                    description = "Te avisan cuando hay un peer cerca o cuando recibes mensajes sin conexión a través de la red mesh.",
                     icon = Icons.Rounded.Notifications,
                     iconTint = MaterialTheme.colorScheme.tertiary,
                     iconBg = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.1f),
@@ -199,8 +199,8 @@ fun PermissionsScreen(
 
                 // Mock Contacts
                 PermissionToggleCard(
-                    title = "Contacts",
-                    description = "Synchronizes your existing contact list to identify which friends are already on the AirVibe network.",
+                    title = "Contactos",
+                    description = "Sincroniza tu lista de contactos para identificar qué amigos ya están en la red AirVibe.",
                     icon = Icons.Rounded.Contacts,
                     iconTint = MaterialTheme.colorScheme.outline,
                     iconBg = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f),
@@ -217,7 +217,7 @@ fun PermissionsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Your data is encrypted and stored locally.",
+                        text = "Tus datos están cifrados y se guardan en tu dispositivo.",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.outline
                     )
@@ -234,7 +234,7 @@ fun PermissionsScreen(
                 Column(modifier = Modifier.fillMaxWidth()) {
                     if (showError && !state.allGranted) {
                         Text(
-                            text = "Please grant all required permissions to continue.",
+                            text = "Por favor, concede todos los permisos requeridos para continuar.",
                             color = MaterialTheme.colorScheme.error,
                             style = MaterialTheme.typography.bodySmall,
                             modifier = Modifier.padding(bottom = 8.dp).align(Alignment.CenterHorizontally)
@@ -263,7 +263,7 @@ fun PermissionsScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Continue",
+                            text = "Continuar",
                             style = MaterialTheme.typography.labelLarge.copy(fontSize = 16.sp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
@@ -335,7 +335,7 @@ private fun PermissionToggleCard(
                     .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
                 Text(
-                    text = "Grant",
+                    text = "Conceder",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

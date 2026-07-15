@@ -28,6 +28,7 @@ import com.example.airvibe.feature.radar.data.local.dao.RadarDao
 import com.example.airvibe.feature.radar.data.local.database.AirVibeDatabase
 import com.example.airvibe.feature.radar.data.remote.SupabaseNodeDataSource
 import com.example.airvibe.feature.radar.data.remote.SupabaseProfileDataSource
+import com.example.airvibe.feature.radar.data.remote.SupabaseAvatarDataSource
 import com.example.airvibe.feature.radar.data.remote.SupabaseSavedContactDataSource
 import com.example.airvibe.feature.radar.data.remote.SupabaseTelemetryDataSource
 import com.example.airvibe.feature.radar.data.sync.CloudSyncService
@@ -121,6 +122,10 @@ object ServiceLocator {
 
     val profileRemoteDataSource: SupabaseProfileDataSource by lazy {
         SupabaseProfileDataSource(supabase = supabaseClient)
+    }
+
+    val avatarRemoteDataSource: SupabaseAvatarDataSource by lazy {
+        SupabaseAvatarDataSource(supabase = supabaseClient)
     }
 
     val savedContactRemoteDataSource: SupabaseSavedContactDataSource by lazy {
@@ -235,6 +240,9 @@ object ServiceLocator {
                     hostNodeId: String,
                     roomId: String,
                 ): Boolean = chatGatewayImpl.sendRoomLeave(hostNodeId, roomId)
+                override suspend fun sendRoomDestroy(
+                    roomId: String,
+                ): Boolean = chatGatewayImpl.sendRoomDestroy(roomId)
                 override suspend fun sendRoomAnnounce(
                     roomId: String,
                     messageId: String,

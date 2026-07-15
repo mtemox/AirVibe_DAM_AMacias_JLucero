@@ -20,7 +20,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
-
+import androidx.compose.animation.Crossfade
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.rememberDrawerState
@@ -72,19 +72,29 @@ fun MainScreen(
                 confirmButton = {
                     androidx.compose.material3.TextButton(
                         onClick = {
-                            // Si el usuario presiona "Ver Grupos", podemos cerrarlo y navegar, o solo cerrarlo.
+                            val alert = currentAlert!!
+                            scope.launch {
+                                com.example.airvibe.core.di.ServiceLocator.proximityRoomRepository.receiveInvite(
+                                    roomId = alert.roomId,
+                                    title = alert.roomTitle,
+                                    hostNodeId = alert.hostNodeId,
+                                    hostName = alert.hostName,
+                                    createdAt = alert.createdAt
+                                )
+                                com.example.airvibe.core.di.ServiceLocator.proximityRoomRepository.joinRoom(alert.roomId)
+                            }
                             com.example.airvibe.feature.chat.presentation.components.RoomInviteAlertManager.dismiss()
                             currentTab = MainTab.Groups
                         }
                     ) {
-                        Text("Ver en Grupos")
+                        Text("Aceptar")
                     }
                 },
                 dismissButton = {
                     androidx.compose.material3.TextButton(
                         onClick = { com.example.airvibe.feature.chat.presentation.components.RoomInviteAlertManager.dismiss() }
                     ) {
-                        Text("Cerrar")
+                        Text("Rechazar")
                     }
                 }
             )
@@ -105,13 +115,15 @@ fun MainScreen(
             }
         ) { paddingValues ->
             Box(modifier = Modifier.padding(paddingValues)) {
-                when (currentTab) {
-                    MainTab.Radar -> radarContent {
-                        scope.launch { drawerState.open() }
+                Crossfade(targetState = currentTab, label = "TabCrossfade") { tab ->
+                    when (tab) {
+                        MainTab.Radar -> radarContent {
+                            scope.launch { drawerState.open() }
+                        }
+                        MainTab.Services -> servicesContent()
+                        MainTab.Groups -> groupsContent()
+                        MainTab.Profile -> profileContent()
                     }
-                    MainTab.Services -> servicesContent()
-                    MainTab.Groups -> groupsContent()
-                    MainTab.Profile -> profileContent()
                 }
             }
         }

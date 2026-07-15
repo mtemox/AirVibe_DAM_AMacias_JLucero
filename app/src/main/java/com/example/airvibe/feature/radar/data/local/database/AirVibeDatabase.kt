@@ -56,7 +56,7 @@ abstract class AirVibeDatabase : RoomDatabase() {
 
     companion object {
         const val DATABASE_NAME = "airvibe.db"
-        const val SCHEMA_VERSION = 12
+        const val SCHEMA_VERSION = 14
 
         @Volatile
         private var instance: AirVibeDatabase? = null
@@ -85,6 +85,8 @@ abstract class AirVibeDatabase : RoomDatabase() {
                     MIGRATION_9_10,
                     MIGRATION_10_11,
                     MIGRATION_11_12,
+                    MIGRATION_12_13,
+                    MIGRATION_13_14,
                 )
                 .fallbackToDestructiveMigration(dropAllTables = false)
                 .build()
@@ -365,6 +367,34 @@ abstract class AirVibeDatabase : RoomDatabase() {
                 db.execSQL(
                     "ALTER TABLE saved_contacts ADD COLUMN is_deleted INTEGER NOT NULL DEFAULT 0",
                 )
+            }
+        }
+
+        /**
+         * Feature 7 — Borrado Offline de Grupos.
+         * Añade la columna 'is_deleted' a proximity_rooms.
+         */
+        private val MIGRATION_12_13: Migration = object : Migration(12, 13) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE proximity_rooms ADD COLUMN is_deleted INTEGER NOT NULL DEFAULT 0",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_proximity_rooms_is_deleted ON proximity_rooms(is_deleted)",
+                )
+            }
+        }
+
+        /**
+         * Feature 8 — Foto de Perfil.
+         * Añade 'avatar_url' y 'avatar_base64' a 'radar_nodes' y 'saved_contacts'.
+         */
+        private val MIGRATION_13_14: Migration = object : Migration(13, 14) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE radar_nodes ADD COLUMN avatar_url TEXT")
+                db.execSQL("ALTER TABLE radar_nodes ADD COLUMN avatar_base64 TEXT")
+                db.execSQL("ALTER TABLE saved_contacts ADD COLUMN avatar_url TEXT")
+                db.execSQL("ALTER TABLE saved_contacts ADD COLUMN avatar_base64 TEXT")
             }
         }
     }

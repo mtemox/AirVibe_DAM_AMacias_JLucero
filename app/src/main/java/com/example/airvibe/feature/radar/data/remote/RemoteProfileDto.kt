@@ -19,4 +19,6 @@ data class RemoteProfileDto(
     @SerialName("is_premium") val isPremium: Boolean = false,
     @SerialName("premium_catalog") val premiumCatalog: String? = null,
     @SerialName("tags") val tags: List<String> = emptyList(),
+    @SerialName("avatar_url") val avatarUrl: String? = null,
+    @SerialName("avatar_base64") val avatarBase64: String? = null,
 )

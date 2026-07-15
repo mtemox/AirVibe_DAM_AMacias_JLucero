@@ -4,13 +4,18 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.airvibe.core.di.ServiceLocator
+import com.example.airvibe.core.ui.feedback.UserMessage
 import com.example.airvibe.feature.chat.domain.model.ProximityRoom
 import com.example.airvibe.feature.chat.domain.model.RoomMessage
 import com.example.airvibe.feature.chat.domain.repository.ChatRepository
 import com.example.airvibe.feature.chat.domain.repository.ProximityRoomRepository
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.combine
@@ -21,20 +26,31 @@ data class GroupRoomUiState(
     val room: ProximityRoom? = null,
     val messages: List<RoomMessage> = emptyList(),
     val isSending: Boolean = false,
+    val isDeleting: Boolean = false,
     val joined: Boolean = false,
     val isLoading: Boolean = true,
     val loadError: String? = null,
     val memberCount: Int = 0,
+    val members: List<com.example.airvibe.feature.chat.domain.model.RoomMember> = emptyList(),
+    val avatars: Map<String, String> = emptyMap(),
 )
 
 class GroupRoomViewModel(
     private val roomId: String,
     private val roomRepository: ProximityRoomRepository,
     private val chatRepository: ChatRepository,
+    private val radarRepository: com.example.airvibe.feature.radar.domain.repository.RadarRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(GroupRoomUiState())
     val uiState: StateFlow<GroupRoomUiState> = _uiState.asStateFlow()
+
+    private val _userMessages = MutableSharedFlow<UserMessage>(
+        replay = 0,
+        extraBufferCapacity = 8,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST,
+    )
+    val userMessages: SharedFlow<UserMessage> = _userMessages.asSharedFlow()
 
     init {
         com.example.airvibe.feature.chat.domain.state.ActiveChatState.setRoomChat(roomId)
@@ -66,12 +82,28 @@ class GroupRoomViewModel(
                 roomRepository.observeMessages(roomId),
                 roomRepository.observeActiveMembers(roomId),
             ) { room, messages, members ->
+                val avatars = mutableMapOf<String, String>()
+                members.forEach { m ->
+                    radarRepository.getProfile(m.nodeId)?.avatarBase64?.let { base64 ->
+                        avatars[m.nodeId] = base64
+                    }
+                }
+                messages.forEach { msg ->
+                    if (!avatars.containsKey(msg.senderNodeId)) {
+                        radarRepository.getProfile(msg.senderNodeId)?.avatarBase64?.let { base64 ->
+                            avatars[msg.senderNodeId] = base64
+                        }
+                    }
+                }
+                
                 GroupRoomUiState(
                     room = room,
                     messages = messages,
                     joined = room?.joined == true,
                     isLoading = false,
                     memberCount = members.size,
+                    members = members,
+                    avatars = avatars,
                 )
             }.collect { state ->
                 _uiState.update {
@@ -81,6 +113,8 @@ class GroupRoomViewModel(
                         joined = state.joined,
                         isLoading = it.isLoading && state.room == null,
                         memberCount = state.memberCount,
+                        members = state.members,
+                        avatars = state.avatars,
                     )
                 }
             }
@@ -96,8 +130,42 @@ class GroupRoomViewModel(
         if (text.isBlank()) return
         viewModelScope.launch {
             _uiState.update { it.copy(isSending = true) }
-            runCatching { chatRepository.sendRoomMessage(roomId, text) }
+            val result = runCatching { chatRepository.sendRoomMessage(roomId, text) }
             _uiState.update { it.copy(isSending = false) }
+            result.onSuccess {
+                _userMessages.tryEmit(UserMessage.Success("Mensaje enviado"))
+            }.onFailure {
+                _userMessages.tryEmit(
+                    UserMessage.Error(it.message ?: "No se pudo enviar el mensaje"),
+                )
+            }
+        }
+    }
+
+    fun leaveOrDeleteRoom() {
+        if (_uiState.value.isDeleting) return
+        _uiState.update { it.copy(isDeleting = true) }
+        _userMessages.tryEmit(UserMessage.Info("Eliminando sala…"))
+        viewModelScope.launch {
+            val room = uiState.value.room
+            val result = runCatching {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                    if (room?.isHost == true) {
+                        runCatching { chatRepository.sendRoomDestroy(roomId) }
+                    } else {
+                        runCatching { chatRepository.sendRoomLeave(roomId) }
+                    }
+                    roomRepository.deleteRoomLocally(roomId)
+                }
+            }
+            _uiState.update { it.copy(isDeleting = false) }
+            result.onSuccess {
+                _userMessages.tryEmit(UserMessage.Success("Sala eliminada"))
+            }.onFailure {
+                _userMessages.tryEmit(
+                    UserMessage.Error(it.message ?: "No se pudo eliminar la sala"),
+                )
+            }
         }
     }
 
@@ -105,10 +173,11 @@ class GroupRoomViewModel(
         private val roomId: String,
         private val roomRepository: ProximityRoomRepository = ServiceLocator.proximityRoomRepository,
         private val chatRepository: ChatRepository = ServiceLocator.chatRepository,
+        private val radarRepository: com.example.airvibe.feature.radar.domain.repository.RadarRepository = ServiceLocator.radarRepository,
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
-            return GroupRoomViewModel(roomId, roomRepository, chatRepository) as T
+            return GroupRoomViewModel(roomId, roomRepository, chatRepository, radarRepository) as T
         }
     }
 }

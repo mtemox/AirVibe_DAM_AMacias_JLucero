@@ -33,6 +33,7 @@ import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -63,11 +64,23 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.airvibe.core.designsystem.modifiers.glassBlur
 import com.example.airvibe.core.designsystem.modifiers.glassShadow
 import com.example.airvibe.core.designsystem.theme.AirVibeTheme
+import com.example.airvibe.core.ui.feedback.rememberUserMessages
+import android.app.Application
+
+@Composable
+private fun profileViewModel(): ProfileViewModel {
+    val context = LocalContext.current
+    val application = context.applicationContext as Application
+    val factory = remember(application) {
+        ProfileViewModel.Factory(application = application)
+    }
+    return viewModel(factory = factory)
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
-    viewModel: ProfileViewModel = viewModel(),
+    viewModel: ProfileViewModel = profileViewModel(),
 ) {
     val profile by viewModel.profile.collectAsStateWithLifecycle()
     val stats by viewModel.stats.collectAsStateWithLifecycle()
@@ -78,11 +91,14 @@ fun ProfileScreen(
     var isEditSheetVisible by remember { mutableStateOf(false) }
     val editSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.White)
-    ) {
+    val (snackbarHostState, snackbarFlow) = rememberUserMessages()
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.White)
+        ) {
         // Top App Bar Area
         Row(
             modifier = Modifier
@@ -92,7 +108,7 @@ fun ProfileScreen(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             IconButton(onClick = { /* TODO */ }) {
-                Icon(imageVector = Icons.Rounded.Menu, contentDescription = "Menu", tint = MaterialTheme.colorScheme.primary)
+                Icon(imageVector = Icons.Rounded.Menu, contentDescription = "Menú", tint = MaterialTheme.colorScheme.primary)
             }
             Text(
                 text = "AirVibe",
@@ -103,7 +119,7 @@ fun ProfileScreen(
                 )
             )
             IconButton(onClick = { /* TODO */ }) {
-                Icon(imageVector = Icons.Rounded.Settings, contentDescription = "Settings", tint = MaterialTheme.colorScheme.primary)
+                Icon(imageVector = Icons.Rounded.Settings, contentDescription = "Ajustes", tint = MaterialTheme.colorScheme.primary)
             }
         }
 
@@ -124,14 +140,24 @@ fun ProfileScreen(
                     .background(Color.LightGray),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = profile.displayName.firstOrNull()?.uppercase() ?: "?",
-                    style = MaterialTheme.typography.headlineLarge.copy(
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 40.sp,
-                    ),
-                    color = MaterialTheme.colorScheme.onBackground,
-                )
+                if (!profile.avatarUrl.isNullOrEmpty() || !profile.avatarBase64.isNullOrEmpty()) {
+                    val imageModel = profile.avatarUrl ?: profile.avatarBase64
+                    coil.compose.AsyncImage(
+                        model = imageModel,
+                        contentDescription = "Avatar",
+                        contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Text(
+                        text = profile.displayName.firstOrNull()?.uppercase() ?: "?",
+                        style = MaterialTheme.typography.headlineLarge.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 40.sp,
+                        ),
+                        color = MaterialTheme.colorScheme.onBackground,
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -200,9 +226,9 @@ fun ProfileScreen(
                     modifier = Modifier.weight(1f).height(48.dp),
                     shape = RoundedCornerShape(12.dp)
                 ) {
-                    Icon(imageVector = Icons.Rounded.Edit, contentDescription = "Edit", modifier = Modifier.size(20.dp))
+                    Icon(imageVector = Icons.Rounded.Edit, contentDescription = "Editar", modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Edit Profile")
+                    Text("Editar perfil")
                 }
                 OutlinedButton(
                     onClick = { shareProfile(context, profile.displayName, profile.id) },
@@ -210,9 +236,9 @@ fun ProfileScreen(
                     shape = RoundedCornerShape(12.dp),
                     border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                 ) {
-                    Icon(imageVector = Icons.Rounded.Share, contentDescription = "Share", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                    Icon(imageVector = Icons.Rounded.Share, contentDescription = "Compartir", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Share", color = MaterialTheme.colorScheme.primary)
+                    Text("Compartir", color = MaterialTheme.colorScheme.primary)
                 }
             }
 
@@ -223,9 +249,9 @@ fun ProfileScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                StatCard(value = stats.trips.toString(), label = "Trips", modifier = Modifier.weight(1f))
-                StatCard(value = stats.rating.toString(), label = "Rating", modifier = Modifier.weight(1f))
-                StatCard(value = stats.friends.toString(), label = "Friends", modifier = Modifier.weight(1f))
+                StatCard(value = stats.trips.toString(), label = "Viajes", modifier = Modifier.weight(1f))
+                StatCard(value = stats.rating.toString(), label = "Calificación", modifier = Modifier.weight(1f))
+                StatCard(value = stats.friends.toString(), label = "Amigos", modifier = Modifier.weight(1f))
             }
 
             // -------- Feature 5: Visibilidad Premium (nuevo bloque) --------
@@ -239,15 +265,59 @@ fun ProfileScreen(
 
             // Settings List
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                SettingsItem(icon = Icons.Rounded.Person, title = "Account", subtitle = "Security notifications, change number")
-                SettingsItem(icon = Icons.Rounded.Lock, title = "Privacy", subtitle = "Blocked contacts, disappearing messages")
-                SettingsItem(icon = Icons.Rounded.Notifications, title = "Notifications", subtitle = "Message, group & call tones")
-                SettingsItem(icon = Icons.Rounded.Palette, title = "Appearance", subtitle = "Chat theme, wallpapers")
-                SettingsItem(icon = Icons.Rounded.Help, title = "Help Center", subtitle = "FAQ, contact us, privacy policy")
+                SettingsItem(icon = Icons.Rounded.Person, title = "Cuenta", subtitle = "Notificaciones de seguridad, cambiar número")
+                SettingsItem(icon = Icons.Rounded.Lock, title = "Privacidad", subtitle = "Contactos bloqueados, mensajes temporales")
+                SettingsItem(icon = Icons.Rounded.Notifications, title = "Notificaciones", subtitle = "Tonos de mensajes, grupos y llamadas")
+                SettingsItem(icon = Icons.Rounded.Palette, title = "Apariencia", subtitle = "Tema del chat, fondos de pantalla")
+                SettingsItem(icon = Icons.Rounded.Help, title = "Centro de ayuda", subtitle = "Preguntas frecuentes, contáctanos, política de privacidad")
             }
 
             Spacer(modifier = Modifier.height(32.dp))
         }
+        }
+
+        // Overlay sutil de carga mientras se guarda el perfil o se
+        // sube la foto. Bloquea taps con un scrim semitransparente
+        // y muestra un `CircularProgressIndicator` centrado.
+        if (isUpdating) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.18f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    shadowElevation = 6.dp,
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = "Guardando…",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
+                }
+            }
+        }
+
+        rememberUserMessages(
+            flow = snackbarFlow,
+            host = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 12.dp),
+        )
     }
 
     if (isEditSheetVisible) {
@@ -371,7 +441,7 @@ fun SettingsItem(icon: ImageVector, title: String, subtitle: String) {
         }
         Icon(
             imageVector = Icons.Rounded.ChevronRight,
-            contentDescription = "Go",
+            contentDescription = "Ir",
             tint = MaterialTheme.colorScheme.outlineVariant
         )
     }

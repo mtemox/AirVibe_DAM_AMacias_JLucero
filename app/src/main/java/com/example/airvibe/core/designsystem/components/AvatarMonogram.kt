@@ -2,6 +2,7 @@ package com.example.airvibe.core.designsystem.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
@@ -29,6 +30,7 @@ fun AvatarMonogram(
     modifier: Modifier = Modifier,
     size: Dp = 44.dp,
     accentBrush: Brush? = null,
+    imageModel: Any? = null,
 ) {
     val initials = remember(name) { computeInitials(name) }
     val brush = accentBrush ?: remember(name) { gradientFor(name) }
@@ -40,16 +42,37 @@ fun AvatarMonogram(
             .background(brush = brush),
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text = initials,
-            color = Color.White,
-            fontWeight = FontWeight.SemiBold,
-            textAlign = TextAlign.Center,
-            style = MaterialTheme.typography.titleMedium.copy(
-                fontSize = (size.value * 0.38f).sp,
+        if (imageModel != null) {
+            val decodedModel = remember(imageModel) {
+                if (imageModel is String && !imageModel.startsWith("http")) {
+                    try {
+                        android.util.Base64.decode(imageModel, android.util.Base64.DEFAULT)
+                    } catch (e: Exception) {
+                        imageModel
+                    }
+                } else {
+                    imageModel
+                }
+            }
+            
+            coil.compose.AsyncImage(
+                model = decodedModel,
+                contentDescription = name,
+                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            Text(
+                text = initials,
+                color = Color.White,
                 fontWeight = FontWeight.SemiBold,
-            ),
-        )
+                textAlign = TextAlign.Center,
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontSize = (size.value * 0.38f).sp,
+                    fontWeight = FontWeight.SemiBold,
+                ),
+            )
+        }
     }
 }
 

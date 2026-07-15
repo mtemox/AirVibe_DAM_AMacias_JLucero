@@ -82,6 +82,15 @@ class ScannerProfileRepositoryImpl(
         state.value = readProfile()
     }
 
+    override suspend fun updateAvatar(avatarUrl: String?, avatarBase64: String?) {
+        prefs.edit().apply {
+            if (avatarUrl != null) putString(KEY_AVATAR_URL, avatarUrl) else remove(KEY_AVATAR_URL)
+            if (avatarBase64 != null) putString(KEY_AVATAR_BASE64, avatarBase64) else remove(KEY_AVATAR_BASE64)
+            apply()
+        }
+        state.value = readProfile()
+    }
+
     override suspend fun applyAuthDisplayName(displayName: String?) {
         if (prefs.getBoolean(KEY_NAME_CUSTOMIZED, false)) return
         val name = displayName?.trim().orEmpty()
@@ -104,6 +113,8 @@ class ScannerProfileRepositoryImpl(
                 isPremium = profile.isPremium,
                 premiumCatalog = profile.premiumCatalog,
                 tags = profile.tags,
+                avatarUrl = profile.avatarUrl,
+                avatarBase64 = profile.avatarBase64,
             ),
         )
     }
@@ -121,6 +132,10 @@ class ScannerProfileRepositoryImpl(
             putBoolean(KEY_IS_PREMIUM, dto.isPremium)
             dto.premiumCatalog?.takeIf { it.isNotBlank() }
                 ?.let { putString(KEY_PREMIUM_CATALOG, it) }
+            dto.avatarUrl?.takeIf { it.isNotBlank() }
+                ?.let { putString(KEY_AVATAR_URL, it) }
+            dto.avatarBase64?.takeIf { it.isNotBlank() }
+                ?.let { putString(KEY_AVATAR_BASE64, it) }
             if (dto.tags.isNotEmpty()) putString(KEY_TAGS, encodeTags(dto.tags))
             putBoolean(KEY_NAME_CUSTOMIZED, true)
             apply()
@@ -138,6 +153,8 @@ class ScannerProfileRepositoryImpl(
         bio = prefs.getString(KEY_BIO, "").orEmpty(),
         isPremium = prefs.getBoolean(KEY_IS_PREMIUM, false),
         premiumCatalog = prefs.getString(KEY_PREMIUM_CATALOG, null)?.takeIf { it.isNotBlank() },
+        avatarUrl = prefs.getString(KEY_AVATAR_URL, null)?.takeIf { it.isNotBlank() },
+        avatarBase64 = prefs.getString(KEY_AVATAR_BASE64, null)?.takeIf { it.isNotBlank() },
         tags = decodeTags(prefs.getString(KEY_TAGS, null)),
     )
 
@@ -177,6 +194,8 @@ class ScannerProfileRepositoryImpl(
         private const val KEY_BIO = "profile.bio"
         private const val KEY_IS_PREMIUM = "profile.isPremium"
         private const val KEY_PREMIUM_CATALOG = "profile.premiumCatalog"
+        private const val KEY_AVATAR_URL = "profile.avatarUrl"
+        private const val KEY_AVATAR_BASE64 = "profile.avatarBase64"
         private const val KEY_NAME_CUSTOMIZED = "profile.nameCustomized"
         private const val DEFAULT_DISPLAY_NAME = "Tú"
         private const val DEFAULT_STATUS = "Disponible en el radar"

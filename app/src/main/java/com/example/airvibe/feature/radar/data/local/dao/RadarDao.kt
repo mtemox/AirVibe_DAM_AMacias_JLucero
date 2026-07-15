@@ -67,7 +67,7 @@ interface RadarDao {
      * con `LOCAL_`. Sirve para limpiar peers descubiertos por
      * Bluetooth sin tocar los datos del seed.
      */
-    @Query("DELETE FROM radar_nodes WHERE id NOT LIKE 'LOCAL\\_%' ESCAPE '\\' AND id NOT IN (SELECT DISTINCT node_id FROM chat_messages) AND kind != 'Group'")
+    @Query("DELETE FROM radar_nodes WHERE id NOT LIKE 'LOCAL\\_%' ESCAPE '\\' AND id NOT IN (SELECT DISTINCT node_id FROM chat_messages)")
     suspend fun clearDiscovered()
 
     @Query("SELECT * FROM radar_nodes WHERE is_favorite = 1 ORDER BY display_name ASC")

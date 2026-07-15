@@ -14,6 +14,7 @@ enum class NearbyChatPayloadKind {
     RoomJoin,
     RoomLeave,
     RoomAnnounce,
+    RoomDestroy,
 }
 
 /**
@@ -48,6 +49,7 @@ internal object NearbyChatPayloadCodec {
     const val TYPE_ROOM_JOIN = "rm_join"
     const val TYPE_ROOM_LEAVE = "rm_leave"
     const val TYPE_ROOM_ANNOUNCE = "rm_annc"
+    const val TYPE_ROOM_DESTROY = "rm_destroy"
 
     private const val FIELD_SEPARATOR = "|"
     private const val DELIMITER = "\u001F"
@@ -235,6 +237,21 @@ internal object NearbyChatPayloadCodec {
         return payload.toByteArray(Charsets.UTF_8)
     }
 
+    fun encodeRoomDestroy(
+        roomId: String,
+        senderNodeId: String,
+        createdAtMillis: Long,
+    ): ByteArray {
+        val payload = listOf(
+            SCHEMA_VERSION,
+            TYPE_ROOM_DESTROY,
+            sanitize(roomId),
+            sanitize(senderNodeId),
+            createdAtMillis.toString(),
+        ).joinToString(FIELD_SEPARATOR)
+        return payload.toByteArray(Charsets.UTF_8)
+    }
+
     fun encodeRoomAnnounce(
         roomId: String,
         senderNodeId: String,
@@ -414,6 +431,18 @@ internal object NearbyChatPayloadCodec {
                 val createdAt = parts[4].toLongOrNull() ?: return null
                 DecodedChatPayload(
                     kind = NearbyChatPayloadKind.RoomLeave,
+                    messageId = parts[2],
+                    senderNodeId = parts[3],
+                    text = "",
+                    createdAtMillis = createdAt,
+                    roomId = parts[2],
+                )
+            }
+            TYPE_ROOM_DESTROY -> {
+                if (parts.size < 5) return null
+                val createdAt = parts[4].toLongOrNull() ?: return null
+                DecodedChatPayload(
+                    kind = NearbyChatPayloadKind.RoomDestroy,
                     messageId = parts[2],
                     senderNodeId = parts[3],
                     text = "",

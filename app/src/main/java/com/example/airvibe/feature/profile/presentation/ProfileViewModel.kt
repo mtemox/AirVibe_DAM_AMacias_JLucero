@@ -3,6 +3,7 @@ package com.example.airvibe.feature.profile.presentation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.airvibe.core.di.ServiceLocator
+import com.example.airvibe.core.ui.feedback.UserMessage
 import com.example.airvibe.feature.auth.domain.model.AuthUser
 import com.example.airvibe.feature.auth.domain.repository.AuthRepository
 import com.example.airvibe.feature.chat.domain.repository.ChatRepository
@@ -13,9 +14,13 @@ import com.example.airvibe.feature.radar.domain.model.VisibilityStats
 import com.example.airvibe.feature.radar.domain.repository.RadarRepository
 import com.example.airvibe.feature.radar.domain.repository.ScannerProfileRepository
 import com.example.airvibe.feature.radar.domain.scanner.ScannerProfile
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
@@ -42,6 +47,7 @@ data class ProfileVisibilityState(
 )
 
 class ProfileViewModel(
+    private val appContext: android.app.Application,
     private val profileRepository: ScannerProfileRepository = ServiceLocator.scannerProfileRepository,
     private val authRepository: AuthRepository = ServiceLocator.authRepository,
     private val radarRepository: RadarRepository = ServiceLocator.radarRepository,
@@ -49,7 +55,17 @@ class ProfileViewModel(
     chatRepository: ChatRepository = ServiceLocator.chatRepository,
     roomRepository: ProximityRoomRepository = ServiceLocator.proximityRoomRepository,
     savedContactDao: SavedContactDao = ServiceLocator.savedContactDao,
+    private val avatarRemoteDataSource: com.example.airvibe.feature.radar.data.remote.SupabaseAvatarDataSource = ServiceLocator.avatarRemoteDataSource,
 ) : ViewModel() {
+
+    class Factory(
+        private val application: android.app.Application,
+    ) : androidx.lifecycle.ViewModelProvider.Factory {
+        @Suppress("UNCHECKED_CAST")
+        override fun <T : ViewModel> create(modelClass: Class<T>): T {
+            return ProfileViewModel(appContext = application) as T
+        }
+    }
 
     val profile: StateFlow<ScannerProfile> = profileRepository.observe()
         .stateIn(
@@ -129,6 +145,15 @@ class ProfileViewModel(
     private val _isUpdating = MutableStateFlow(false)
     val isUpdating: StateFlow<Boolean> = _isUpdating.asStateFlow()
 
+    // Feedback efímero (snackbars) dirigido a la UI. `replay = 0`
+    // para que los mensajes no se reemitan al rotar la pantalla.
+    private val _userMessages = MutableSharedFlow<UserMessage>(
+        replay = 0,
+        extraBufferCapacity = 8,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST,
+    )
+    val userMessages: SharedFlow<UserMessage> = _userMessages.asSharedFlow()
+
     fun updateProfile(
         draft: com.example.airvibe.feature.radar.presentation.components.OwnProfileDraft
     ) {
@@ -137,12 +162,45 @@ class ProfileViewModel(
         val trimmedStatus = draft.status.trim()
         if (trimmedName.isEmpty() || trimmedStatus.isEmpty()) return
         _isUpdating.value = true
+
+        val hasAvatarChange = draft.avatarUri != null
+
+        if (hasAvatarChange) {
+            _userMessages.tryEmit(UserMessage.Info("Subiendo foto de perfil…"))
+        }
+        _userMessages.tryEmit(UserMessage.Info("Guardando perfil…"))
+
         viewModelScope.launch {
             val cleanedTags = draft.tags
                 .map { it.trim() }
                 .filter { it.isNotEmpty() }
                 .distinct()
-            runCatching {
+
+            val avatarUploadSucceeded = if (hasAvatarChange) {
+                val userId = profileRepository.current().id
+                val base64 = com.example.airvibe.core.util.ImageCompressor.compressToBase64(appContext, draft.avatarUri!!)
+                val bytesForUpload = com.example.airvibe.core.util.ImageCompressor.compressForUpload(appContext, draft.avatarUri)
+                var avatarUrl: String? = null
+                var uploadedOk = false
+
+                if (bytesForUpload != null) {
+                    val uploadResult = runCatching {
+                        avatarRemoteDataSource.uploadAvatar(userId, bytesForUpload)
+                    }.getOrElse { Result.failure(it) }
+
+                    if (uploadResult.isSuccess) {
+                        avatarUrl = uploadResult.getOrNull()
+                        uploadedOk = avatarUrl != null
+                    }
+                }
+
+                runCatching { profileRepository.updateAvatar(avatarUrl, base64) }
+                uploadedOk
+            } else {
+                true
+            }
+
+            val profileUpdateResult = runCatching {
                 profileRepository.update(trimmedName, trimmedStatus, cleanedTags)
                 profileRepository.updateKind(draft.kind)
                 profileRepository.updatePresence(draft.presence)
@@ -150,11 +208,31 @@ class ProfileViewModel(
                 profileRepository.updateBio(draft.bio)
                 profileRepository.updatePremium(draft.isPremium, draft.premiumCatalog)
             }
-                .onSuccess {
-                    runCatching { profileRepository.syncToRemote(profileRepository.current()) }
-                    runCatching { ServiceLocator.requestContactsSync() }
-                }
+
+            profileUpdateResult.onSuccess {
+                runCatching { profileRepository.syncToRemote(profileRepository.current()) }
+                runCatching { ServiceLocator.requestContactsSync() }
+            }
+
             _isUpdating.value = false
+
+            if (hasAvatarChange) {
+                _userMessages.tryEmit(
+                    if (avatarUploadSucceeded) {
+                        UserMessage.Success("Foto de perfil actualizada")
+                    } else {
+                        UserMessage.Error("No se pudo subir la foto de perfil")
+                    },
+                )
+            }
+
+            profileUpdateResult.onSuccess {
+                _userMessages.tryEmit(UserMessage.Success("Perfil actualizado correctamente"))
+            }.onFailure {
+                _userMessages.tryEmit(
+                    UserMessage.Error(it.message ?: "No se pudo guardar el perfil"),
+                )
+            }
         }
     }
 }

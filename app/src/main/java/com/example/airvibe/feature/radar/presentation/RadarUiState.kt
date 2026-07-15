@@ -56,12 +56,10 @@ data class RadarUiState(
     val displayNodes: List<RadarNode>
         get() {
             val ownId = ownProfile?.id
-            val live = liveNodes
+            return liveNodes
                 .filter { ownId == null || it.id != ownId }
                 .filterNot { it.id.startsWith("pending-") }
                 .filterNot { hideDemoNodes && it.id.startsWith(RadarSeedData.SEED_ID_PREFIX) }
-            val groupNodes = nodes.filter { it.kind == RadarNodeKind.Group }
-            return live + groupNodes
         }
 
     val hasNodes: Boolean get() = displayNodes.isNotEmpty()

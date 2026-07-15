@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -34,6 +35,7 @@ import com.example.airvibe.R
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.airvibe.core.designsystem.components.AirVibeAmbientBackground
+import com.example.airvibe.core.ui.feedback.rememberUserMessages
 import com.example.airvibe.feature.chat.domain.model.MessageDirection
 import com.example.airvibe.feature.chat.presentation.components.ChatComposer
 import com.example.airvibe.feature.chat.presentation.components.ChatTopBar
@@ -63,6 +65,8 @@ fun ChatScreen(
         }
     }
 
+    val (snackbarHostState, snackbarFlow) = rememberUserMessages()
+
     Box(modifier = Modifier.fillMaxSize().background(Color(0xFFE8ECEF))) {
         Image(
             painter = painterResource(id = R.drawable.wave_pattern),
@@ -79,6 +83,7 @@ fun ChatScreen(
         ) {
             ChatTopBar(
                 peerDisplayName = state.peerDisplayName,
+                peerAvatarBase64 = state.peerAvatarBase64,
                 isConnected = state.isConnected,
                 onBack = onBack,
                 onMore = onMore,
@@ -99,22 +104,32 @@ fun ChatScreen(
                         top = 8.dp,
                         bottom = 8.dp,
                     ),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
-                    items(
+                    itemsIndexed(
                         items = state.messages.asReversed(),
-                        key = { it.id },
-                    ) { message ->
+                        key = { _, it -> it.id },
+                    ) { index, message ->
                         val isMine = message.direction == MessageDirection.Outgoing
+                        val reversedMessages = state.messages.asReversed()
+                        val isAboveSameSender = if (index + 1 < reversedMessages.size) {
+                            reversedMessages[index + 1].direction == message.direction
+                        } else false
+
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = if (isAboveSameSender) 0.dp else 6.dp),
                             horizontalArrangement = if (isMine) {
                                 Arrangement.End
                             } else {
                                 Arrangement.Start
                             },
                         ) {
-                            MessageBubble(message = message)
+                            MessageBubble(
+                                message = message,
+                                isAboveSameSender = isAboveSameSender
+                            )
                         }
                     }
                 }
@@ -134,6 +149,14 @@ fun ChatScreen(
                 isBroadcasting = state.isBroadcasting,
             )
         }
+
+        rememberUserMessages(
+            flow = snackbarFlow,
+            host = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 12.dp),
+        )
     }
 }
 

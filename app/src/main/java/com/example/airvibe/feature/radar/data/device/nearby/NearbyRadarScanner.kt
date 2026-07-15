@@ -281,16 +281,6 @@ class NearbyRadarScanner(
     ) {
         if (profile.id == currentProfile?.id) return
 
-        if (profile.id in confirmedProfileIds) {
-            endpointToNodeId[endpointId] = profile.id
-            scope.launch {
-                repository.removePendingNodes()
-                chatGateway?.bindEndpoint(profile.id, endpointId)
-            }
-            updateDiscoveredCount()
-            return
-        }
-
         val signal = DiscoveredPeer.signalFor(distanceLevel)
         val peer = DiscoveredPeer(
             endpointId = endpointId,
@@ -300,6 +290,19 @@ class NearbyRadarScanner(
         )
         val accent = colorFor(endpointId)
         val node = peer.toRadarNode(accentColor = accent)
+
+        if (profile.id in confirmedProfileIds) {
+            endpointToNodeId[endpointId] = profile.id
+            replaceLiveNode(endpointId, node)
+            scope.launch {
+                purgePendingNodes()
+                repository.upsertNode(node)
+                chatGateway?.bindEndpoint(profile.id, endpointId)
+            }
+            updateDiscoveredCount()
+            return
+        }
+
         confirmedProfileIds += profile.id
         replaceLiveNode(endpointId, node)
         scope.launch {

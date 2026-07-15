@@ -365,6 +365,7 @@ fun RadarScreen(
                         bio = draft.bio,
                         isPremium = draft.isPremium,
                         premiumCatalog = draft.premiumCatalog,
+                        avatarUri = draft.avatarUri,
                     )
                 },
                 onDismiss = { viewModel.onEvent(RadarUiEvent.DismissOwnProfile) },

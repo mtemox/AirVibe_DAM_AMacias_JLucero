@@ -4,7 +4,14 @@ import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "proximity_rooms")
+import androidx.room.Index
+
+@Entity(
+    tableName = "proximity_rooms",
+    indices = [
+        Index(value = ["is_deleted"], name = "index_proximity_rooms_is_deleted")
+    ]
+)
 data class ProximityRoomEntity(
     @PrimaryKey
     @ColumnInfo(name = "id")
@@ -30,4 +37,7 @@ data class ProximityRoomEntity(
 
     @ColumnInfo(name = "is_synced", defaultValue = "0")
     val isSynced: Boolean = false,
+
+    @ColumnInfo(name = "is_deleted", defaultValue = "0")
+    val isDeleted: Boolean = false,
 )

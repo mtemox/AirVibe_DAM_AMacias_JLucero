@@ -47,6 +47,9 @@ interface ChatMessageGateway {
     /** Guest → Host: el Guest abandona la sala. */
     suspend fun sendRoomLeave(hostNodeId: String, roomId: String): Boolean
 
+    /** Host → Guests: el Host destruye la sala. */
+    suspend fun sendRoomDestroy(roomId: String): Boolean
+
     /**
      * Host → Guests: anuncia un mensaje de la sala. La capa de
      * transporte se encarga de hacer broadcast SOLO a los

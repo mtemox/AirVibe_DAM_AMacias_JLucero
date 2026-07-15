@@ -10,6 +10,7 @@ import com.example.airvibe.feature.chat.domain.model.ChatMessage
 data class ChatUiState(
     val peerNodeId: String = "",
     val peerDisplayName: String = "",
+    val peerAvatarBase64: String? = null,
     val messages: List<ChatMessage> = emptyList(),
     val composer: String = "",
     val isSending: Boolean = false,

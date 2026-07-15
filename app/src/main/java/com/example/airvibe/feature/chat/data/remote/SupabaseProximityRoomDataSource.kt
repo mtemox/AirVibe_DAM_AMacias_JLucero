@@ -23,6 +23,15 @@ class SupabaseProximityRoomDataSource(
             .decodeList<RemoteProximityRoomDto>()
     }
 
+    suspend fun delete(id: String, ownerId: String): Result<Unit> = runCatching {
+        supabase.postgrest.from(TABLE).delete {
+            filter { 
+                eq("id", id)
+                eq("owner_id", ownerId) 
+            }
+        }
+    }
+
     companion object {
         const val TABLE = "proximity_rooms"
     }

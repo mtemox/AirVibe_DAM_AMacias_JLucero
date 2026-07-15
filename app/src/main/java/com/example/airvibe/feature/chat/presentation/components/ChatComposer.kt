@@ -111,7 +111,7 @@ fun ChatComposer(
             if (showBroadcast) {
                 Icon(
                     imageVector = Icons.Rounded.BroadcastOnPersonal,
-                    contentDescription = "Broadcast",
+                    contentDescription = "Transmitir",
                     tint = if (isBroadcasting) Color(0xFF075E54) else Color(0xFF747686),
                     modifier = Modifier
                         .size(28.dp)
@@ -121,14 +121,14 @@ fun ChatComposer(
 
             Icon(
                 imageVector = Icons.Rounded.AttachFile,
-                contentDescription = "Attach",
+                contentDescription = "Adjuntar",
                 tint = Color(0xFF747686),
                 modifier = Modifier.size(28.dp).padding(start = 4.dp)
             )
 
             Icon(
                 imageVector = Icons.Rounded.PhotoCamera,
-                contentDescription = "Camera",
+                contentDescription = "Cámara",
                 tint = Color(0xFF747686),
                 modifier = Modifier.size(28.dp).padding(start = 4.dp)
             )

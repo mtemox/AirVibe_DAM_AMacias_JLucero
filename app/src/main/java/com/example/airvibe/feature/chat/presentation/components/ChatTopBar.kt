@@ -39,9 +39,11 @@ import com.example.airvibe.R
 @Composable
 fun ChatTopBar(
     peerDisplayName: String,
+    peerAvatarBase64: String? = null,
     isConnected: Boolean,
     onBack: () -> Unit,
     onMore: () -> Unit = {},
+    moreMenu: @Composable () -> Unit = {},
     subtitle: String? = null,
     badgeText: String = "Chat P2P",
     modifier: Modifier = Modifier,
@@ -63,7 +65,7 @@ fun ChatTopBar(
             IconButton(onClick = onBack) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                    contentDescription = "Back",
+                    contentDescription = "Atrás",
                     tint = Color(0xFF444655)
                 )
             }
@@ -75,10 +77,10 @@ fun ChatTopBar(
                     .background(Color(0xFFE2E2E2))
                     .border(1.dp, Color(0xFFE2E2E2), CircleShape)
             ) {
-                Image(
-                    painter = painterResource(id = R.drawable.ic_launcher_background), // Temporary avatar
-                    contentDescription = null,
-                    modifier = Modifier.fillMaxSize()
+                com.example.airvibe.core.designsystem.components.AvatarMonogram(
+                    name = peerDisplayName,
+                    size = 40.dp,
+                    imageModel = peerAvatarBase64,
                 )
             }
             
@@ -91,7 +93,7 @@ fun ChatTopBar(
                     color = Color(0xFF1A1C1C)
                 )
                 Text(
-                    text = if (isConnected) "online" else "offline",
+                    text = if (isConnected) "en línea" else "sin conexión",
                     color = Color(0xFF444655),
                     style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium)
                 )
@@ -102,23 +104,26 @@ fun ChatTopBar(
             IconButton(onClick = { /* TODO Video Call */ }) {
                 Icon(
                     imageVector = Icons.Rounded.Videocam,
-                    contentDescription = "Video Call",
+                    contentDescription = "Videollamada",
                     tint = Color(0xFF444655)
                 )
             }
             IconButton(onClick = { /* TODO Call */ }) {
                 Icon(
                     imageVector = Icons.Rounded.Call,
-                    contentDescription = "Call",
+                    contentDescription = "Llamada",
                     tint = Color(0xFF444655)
                 )
             }
-            IconButton(onClick = onMore) {
-                Icon(
-                    imageVector = Icons.Rounded.MoreVert,
-                    contentDescription = "More",
-                    tint = Color(0xFF444655)
-                )
+            Box {
+                IconButton(onClick = onMore) {
+                    Icon(
+                        imageVector = Icons.Rounded.MoreVert,
+                        contentDescription = "Más",
+                        tint = Color(0xFF444655)
+                    )
+                }
+                moreMenu()
             }
         }
     }

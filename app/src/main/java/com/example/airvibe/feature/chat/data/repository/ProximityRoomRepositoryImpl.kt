@@ -149,6 +149,13 @@ class ProximityRoomRepositoryImpl(
     override fun observeAllMembers(roomId: String): Flow<List<RoomMember>> =
         roomDao.observeAllMembers(roomId).map { rows -> rows.map { it.toDomain() } }
 
+    override suspend fun deleteRoomLocally(roomId: String) {
+        roomDao.deleteMembers(roomId)
+        roomDao.deleteMessages(roomId)
+        roomDao.deleteRoom(roomId)
+        notifyChanged()
+    }
+
     override suspend fun insertOutgoingMessage(roomId: String, text: String): RoomMessage {
         val trimmed = text.trim()
         require(trimmed.isNotEmpty())

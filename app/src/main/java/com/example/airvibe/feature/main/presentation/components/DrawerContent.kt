@@ -30,6 +30,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -62,6 +64,9 @@ fun DrawerContent(
                 .padding(bottom = 24.dp, top = 8.dp)
         ) {
             // Header Profile
+            val profile by com.example.airvibe.core.di.ServiceLocator.scannerProfileRepository.observe()
+                .collectAsStateWithLifecycle(initialValue = null)
+
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -77,21 +82,36 @@ fun DrawerContent(
                         .background(Color.LightGray),
                     contentAlignment = Alignment.Center
                 ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.ic_launcher_background), // Fallback image
-                        contentDescription = "Avatar",
-                        modifier = Modifier.fillMaxSize()
-                    )
+                    if (profile?.avatarBase64 != null) {
+                        com.example.airvibe.core.designsystem.components.AvatarMonogram(
+                            name = profile?.displayName ?: "?",
+                            size = 48.dp,
+                            imageModel = profile?.avatarBase64
+                        )
+                    } else if (profile != null) {
+                        com.example.airvibe.core.designsystem.components.AvatarMonogram(
+                            name = profile?.displayName ?: "?",
+                            size = 48.dp
+                        )
+                    } else {
+                        Image(
+                            painter = painterResource(id = R.drawable.ic_launcher_background), // Fallback image
+                            contentDescription = "Avatar",
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
                 }
                 Spacer(modifier = Modifier.width(16.dp))
                 Column {
                     Text(
-                        text = "User Name",
+                        text = profile?.displayName ?: "Usuario",
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                     )
                     Text(
-                        text = "AirVibe Member",
+                        text = "Miembro de AirVibe",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -103,17 +123,17 @@ fun DrawerContent(
             // Navigation Links
             DrawerItem(
                 icon = Icons.Rounded.Home,
-                label = "Home",
+                label = "Inicio",
                 isActive = true
             )
             DrawerItem(
                 icon = Icons.Rounded.History,
-                label = "History",
+                label = "Historial",
                 isActive = false
             )
             DrawerItem(
                 icon = Icons.Rounded.Notifications,
-                label = "Notifications",
+                label = "Notificaciones",
                 isActive = false
             )
 
@@ -124,7 +144,7 @@ fun DrawerContent(
 
             DrawerItem(
                 icon = Icons.Rounded.SupportAgent,
-                label = "Support",
+                label = "Soporte",
                 isActive = false
             )
 
@@ -142,13 +162,13 @@ fun DrawerContent(
             ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Rounded.ExitToApp,
-                    contentDescription = "Sign Out",
+                    contentDescription = "Cerrar sesión",
                     tint = MaterialTheme.colorScheme.error,
                     modifier = Modifier.size(24.dp)
                 )
                 Spacer(modifier = Modifier.width(16.dp))
                 Text(
-                    text = "Sign Out",
+                    text = "Cerrar sesión",
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.error
                 )

@@ -22,6 +22,7 @@ interface ProximityRoomRepository {
     ): ProximityRoom
 
     suspend fun joinRoom(roomId: String)
+    suspend fun deleteRoomLocally(roomId: String)
     suspend fun insertOutgoingMessage(roomId: String, text: String): RoomMessage
     suspend fun persistIncomingMessage(
         roomId: String,

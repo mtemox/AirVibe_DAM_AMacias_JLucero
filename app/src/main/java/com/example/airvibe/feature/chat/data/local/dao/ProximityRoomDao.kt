@@ -13,22 +13,40 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface ProximityRoomDao {
 
-    @Query("SELECT * FROM proximity_rooms ORDER BY created_at DESC")
+    @Query("SELECT * FROM proximity_rooms WHERE is_deleted = 0 ORDER BY created_at DESC")
     fun observeRooms(): Flow<List<ProximityRoomEntity>>
 
-    @Query("SELECT * FROM proximity_rooms WHERE id = :id LIMIT 1")
+    @Query("SELECT * FROM proximity_rooms WHERE id = :id AND is_deleted = 0 LIMIT 1")
     fun observeRoomById(id: String): Flow<ProximityRoomEntity?>
 
-    @Query("SELECT * FROM proximity_rooms WHERE id = :id LIMIT 1")
+    @Query("SELECT * FROM proximity_rooms WHERE id = :id AND is_deleted = 0 LIMIT 1")
     suspend fun getRoom(id: String): ProximityRoomEntity?
+
+    @Query("SELECT * FROM proximity_rooms WHERE id = :id LIMIT 1")
+    suspend fun getRoomIncludingDeleted(id: String): ProximityRoomEntity?
 
     @Upsert
     suspend fun upsertRoom(room: ProximityRoomEntity)
 
+    @Query("UPDATE proximity_rooms SET is_deleted = 1, is_synced = 0 WHERE id = :id")
+    suspend fun deleteRoom(id: String)
+    
+    @Query("DELETE FROM proximity_rooms WHERE id = :id")
+    suspend fun hardDeleteRoom(id: String)
+    
+    @Query("SELECT * FROM proximity_rooms WHERE is_deleted = 1 AND is_synced = 0")
+    suspend fun getPendingDeletions(): List<ProximityRoomEntity>
+
+    @Query("DELETE FROM room_messages WHERE room_id = :roomId")
+    suspend fun deleteMessages(roomId: String)
+
+    @Query("DELETE FROM room_members WHERE room_id = :roomId")
+    suspend fun deleteMembers(roomId: String)
+
     @Query("UPDATE proximity_rooms SET joined = 1, is_synced = 0 WHERE id = :id")
     suspend fun markJoined(id: String)
 
-    @Query("SELECT * FROM proximity_rooms WHERE is_synced = 0")
+    @Query("SELECT * FROM proximity_rooms WHERE is_synced = 0 AND is_deleted = 0")
     suspend fun getPendingRooms(): List<ProximityRoomEntity>
 
     @Query("UPDATE proximity_rooms SET is_synced = 1 WHERE id IN (:ids)")

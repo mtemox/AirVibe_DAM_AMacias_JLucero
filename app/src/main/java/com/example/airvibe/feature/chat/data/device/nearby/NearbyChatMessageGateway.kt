@@ -268,6 +268,21 @@ class NearbyChatMessageGateway(
         }.isSuccess
     }
 
+    override suspend fun sendRoomDestroy(
+        roomId: String,
+    ): Boolean {
+        val endpoints = roomMutex.withLock { roomEndpoints[roomId]?.toList().orEmpty() }
+        if (endpoints.isEmpty()) return false
+        val bytes = NearbyChatPayloadCodec.encodeRoomDestroy(
+            roomId = roomId,
+            senderNodeId = localUserIdProvider(),
+            createdAtMillis = System.currentTimeMillis(),
+        )
+        return runCatching {
+            connectionsClient.sendPayload(endpoints, Payload.fromBytes(bytes))
+        }.isSuccess
+    }
+
     override suspend fun sendRoomAnnounce(
         roomId: String,
         messageId: String,
@@ -340,38 +355,20 @@ class NearbyChatMessageGateway(
                         val hostName = decoded.senderDisplayName?.takeIf { it.isNotBlank() }
                             ?: radarRepository.getProfile(senderNodeId)?.displayName
                             ?: "Usuario cercano"
-                        roomRepository.receiveInvite(
-                            roomId = roomId,
-                            title = decoded.text,
-                            hostNodeId = senderNodeId,
-                            hostName = hostName,
-                            createdAt = decoded.createdAtMillis,
-                        )
                         RoomInviteNotificationManager.postInvite(
                             context = context,
                             roomId = roomId,
                             hostName = hostName,
                             roomTitle = decoded.text,
                         )
-                        // Añadir grupo al radar para que sea visible ahí también
-                        val roomNode = RadarNode(
-                            id = "room:$roomId",
-                            displayName = decoded.text,
-                            status = "Invitación de $hostName",
-                            detail = "Sala de proximidad — ${decoded.text}",
-                            kind = RadarNodeKind.Group,
-                            presence = PresenceStatus.Online,
-                            angleDegrees = (roomId.hashCode().toLong() and 0xFFFFFFFFL)
-                                .let { ((it % 360).toInt()).toFloat() }
-                                .coerceIn(0f, 359.9f),
-                            distanceNormalized = 0.18f,
-                            signalStrength = 0.95f,
-                            accentColor = androidx.compose.ui.graphics.Color(0xFF8B5CF6),
-                            tags = listOf("Sala", roomId),
+                        // Mostrar alerta in-app, esperando aceptación manual
+                        RoomInviteAlertManager.showInvite(
+                            roomId = roomId,
+                            roomTitle = decoded.text,
+                            hostName = hostName,
+                            hostNodeId = senderNodeId,
+                            createdAt = decoded.createdAtMillis
                         )
-                        radarRepository.upsertNode(roomNode)
-                        // Disparar la alerta in-app
-                        RoomInviteAlertManager.showInvite(roomId, decoded.text, hostName)
                     }
                 }
             }
@@ -540,6 +537,15 @@ class NearbyChatMessageGateway(
                         }
                     }
                     roomRepository.markMemberLeft(roomId, leavingNodeId)
+                }
+            }
+            NearbyChatPayloadKind.RoomDestroy -> {
+                val roomId = decoded.roomId ?: decoded.messageId
+                scope.launch {
+                    roomMutex.withLock {
+                        roomEndpoints.remove(roomId)
+                    }
+                    roomRepository.deleteRoomLocally(roomId)
                 }
             }
             NearbyChatPayloadKind.RoomAnnounce -> {

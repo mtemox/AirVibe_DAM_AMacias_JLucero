@@ -37,6 +37,7 @@ class RadarViewModel(
     private val matchPreferences: MatchPreferencesRepository,
     private val chatRepository: ChatRepository,
     private val chatGateway: ChatMessageGateway = ServiceLocator.chatGateway,
+    private val avatarRemoteDataSource: com.example.airvibe.feature.radar.data.remote.SupabaseAvatarDataSource = ServiceLocator.avatarRemoteDataSource,
     private val onSignOut: suspend () -> Result<Unit> = { ServiceLocator.authRepository.signOut() },
 ) : ViewModel() {
 
@@ -392,8 +393,25 @@ class RadarViewModel(
         bio: String,
         isPremium: Boolean,
         premiumCatalog: String?,
+        avatarUri: android.net.Uri?,
     ) {
         viewModelScope.launch {
+            if (avatarUri != null) {
+                val userId = profileRepository.current().id
+                val base64 = com.example.airvibe.core.util.ImageCompressor.compressToBase64(appContext, avatarUri)
+                val bytesForUpload = com.example.airvibe.core.util.ImageCompressor.compressForUpload(appContext, avatarUri)
+                var avatarUrl: String? = null
+                
+                if (bytesForUpload != null) {
+                    val uploadResult = avatarRemoteDataSource.uploadAvatar(userId, bytesForUpload)
+                    if (uploadResult.isSuccess) {
+                        avatarUrl = uploadResult.getOrNull()
+                    }
+                }
+                
+                profileRepository.updateAvatar(avatarUrl, base64)
+            }
+            
             profileRepository.update(displayName, status, tags)
             profileRepository.updateKind(kind)
             profileRepository.updatePresence(presence)
@@ -443,8 +461,9 @@ class RadarViewModel(
         bio: String,
         isPremium: Boolean,
         premiumCatalog: String?,
+        avatarUri: android.net.Uri?,
     ) {
-        saveOwnProfile(displayName, status, tags, kind, presence, headline, bio, isPremium, premiumCatalog)
+        saveOwnProfile(displayName, status, tags, kind, presence, headline, bio, isPremium, premiumCatalog, avatarUri)
     }
 
     private fun signOut() {
@@ -574,6 +593,7 @@ class RadarViewModel(
         private val authRepository: AuthRepository = ServiceLocator.authRepository,
         private val matchPreferences: MatchPreferencesRepository = ServiceLocator.matchPreferencesRepository,
         private val chatRepository: ChatRepository = ServiceLocator.chatRepository,
+        private val avatarRemoteDataSource: com.example.airvibe.feature.radar.data.remote.SupabaseAvatarDataSource = ServiceLocator.avatarRemoteDataSource,
         private val onSignOut: suspend () -> Result<Unit> = { ServiceLocator.authRepository.signOut() },
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
@@ -590,6 +610,7 @@ class RadarViewModel(
                 authRepository = authRepository,
                 matchPreferences = matchPreferences,
                 chatRepository = chatRepository,
+                avatarRemoteDataSource = avatarRemoteDataSource,
                 onSignOut = onSignOut,
             ) as T
         }

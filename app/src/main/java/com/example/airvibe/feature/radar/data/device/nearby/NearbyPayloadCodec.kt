@@ -30,7 +30,8 @@ import com.example.airvibe.feature.radar.domain.scanner.toNodeKindOrDefault
  */
 internal object NearbyPayloadCodec {
 
-    private const val SCHEMA_VERSION = "v3"
+    private const val SCHEMA_VERSION = "v4"
+    private const val LEGACY_V3 = "v3"
     private const val LEGACY_V2 = "v2"
     private const val LEGACY_V1 = "v1"
     private const val DELIMITER = "\u001F"
@@ -40,7 +41,7 @@ internal object NearbyPayloadCodec {
     private const val MAX_CATALOG_BYTES = 8 * 1024
 
     /**
-     * Serializa un [ScannerProfile] a bytes UTF-8 (esquema v3).
+     * Serializa un [ScannerProfile] a bytes UTF-8 (esquema v4).
      * Si el usuario no es Premium, el campo `catalog` se omite para
      * ahorrar ancho de banda.
      */
@@ -53,6 +54,9 @@ internal object NearbyPayloadCodec {
         } else {
             ""
         }
+        val safeAvatarUrl = sanitize(profile.avatarUrl.orEmpty())
+        val safeAvatarBase64 = sanitize(profile.avatarBase64.orEmpty())
+        
         val payload = listOf(
             SCHEMA_VERSION,
             profile.id,
@@ -64,13 +68,15 @@ internal object NearbyPayloadCodec {
             safeBio,
             if (profile.isPremium) "1" else "0",
             catalog,
+            safeAvatarUrl,
+            safeAvatarBase64,
             tags,
         ).joinToString(FIELD_SEPARATOR)
         return payload.toByteArray(Charsets.UTF_8)
     }
 
     /**
-     * Deserializa un payload recibido. Acepta v1, v2 y v3. Devuelve
+     * Deserializa un payload recibido. Acepta v1, v2, v3 y v4. Devuelve
      * `null` si el contenido no respeta ninguno de los esquemas
      * conocidos.
      */
@@ -79,11 +85,36 @@ internal object NearbyPayloadCodec {
         val parts = text.split(FIELD_SEPARATOR)
         if (parts.size < 5) return null
         return when (parts[0]) {
-            SCHEMA_VERSION -> decodeV3(parts)
+            SCHEMA_VERSION -> decodeV4(parts)
+            LEGACY_V3 -> decodeV3(parts)
             LEGACY_V2 -> decodeV2(parts)
             LEGACY_V1 -> decodeV1(parts)
             else -> null
         }
+    }
+
+    private fun decodeV4(parts: List<String>): ScannerProfile? {
+        if (parts.size < 13) return null
+        val isPremium = parts[8] == "1"
+        val catalog = parts[9].takeIf { it.isNotEmpty() && isPremium }
+        val avatarUrl = parts[10].takeIf { it.isNotEmpty() }
+        val avatarBase64 = parts[11].takeIf { it.isNotEmpty() }
+        val tags = if (parts[12].isEmpty()) emptyList() else parts[12].split(DELIMITER)
+        return ScannerProfile(
+            id = parts[1],
+            displayName = parts[2],
+            status = parts[3],
+            kind = parts[4].toNodeKindOrDefault(),
+            presence = runCatching { PresenceStatus.valueOf(parts[5]) }
+                .getOrDefault(PresenceStatus.Online),
+            headline = parts[6].unsanitize(),
+            bio = parts[7].unsanitize(),
+            isPremium = isPremium,
+            premiumCatalog = catalog?.unsanitize(),
+            avatarUrl = avatarUrl?.unsanitize(),
+            avatarBase64 = avatarBase64?.unsanitize(),
+            tags = tags,
+        )
     }
 
     private fun decodeV3(parts: List<String>): ScannerProfile? {

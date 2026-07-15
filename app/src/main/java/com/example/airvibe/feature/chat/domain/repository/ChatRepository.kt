@@ -66,6 +66,12 @@ interface ChatRepository {
 
     /** Envía la notificación de unión al anfitrión. */
     suspend fun sendRoomJoin(roomId: String)
+
+    /** Abandona la sala y notifica al anfitrión. */
+    suspend fun sendRoomLeave(roomId: String)
+
+    /** Destruye la sala y notifica a los participantes. */
+    suspend fun sendRoomDestroy(roomId: String)
 }
 
 data class ConversationSummary(
@@ -75,6 +81,7 @@ data class ConversationSummary(
     val lastTimestamp: Long,
     val unreadCount: Int,
     val isGroupInvite: Boolean,
+    val avatarBase64: String? = null,
 )
 
 data class BroadcastResult(

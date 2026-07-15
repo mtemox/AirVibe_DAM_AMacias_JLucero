@@ -83,6 +83,7 @@ fun ConversationRow(
                     AvatarMonogram(
                         name = summary.displayName,
                         size = 40.dp,
+                        imageModel = summary.avatarBase64
                     )
                 }
             }

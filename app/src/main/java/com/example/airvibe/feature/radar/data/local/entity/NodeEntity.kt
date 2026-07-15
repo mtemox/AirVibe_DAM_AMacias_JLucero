@@ -79,6 +79,12 @@ data class NodeEntity(
 
     @ColumnInfo(name = "premium_catalog")
     val premiumCatalog: String? = null,
+    
+    @ColumnInfo(name = "avatar_url")
+    val avatarUrl: String? = null,
+    
+    @ColumnInfo(name = "avatar_base64")
+    val avatarBase64: String? = null,
 
     @ColumnInfo(name = "is_favorite", defaultValue = "0")
     val isFavorite: Boolean = false,

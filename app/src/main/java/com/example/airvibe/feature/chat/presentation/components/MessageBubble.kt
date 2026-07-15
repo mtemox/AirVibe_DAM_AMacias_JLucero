@@ -48,15 +48,17 @@ import java.util.Locale
 @Composable
 fun MessageBubble(
     message: ChatMessage,
+    isAboveSameSender: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val isOutgoing = message.direction == MessageDirection.Outgoing
     val isInvite = message.kind == MessageKind.GroupInvite
 
+    val topCorner = if (isAboveSameSender) 8.dp else 0.dp
     val bubbleShape = if (isOutgoing) {
-        RoundedCornerShape(topStart = 8.dp, topEnd = 0.dp, bottomStart = 8.dp, bottomEnd = 8.dp)
+        RoundedCornerShape(topStart = 8.dp, topEnd = topCorner, bottomStart = 8.dp, bottomEnd = 8.dp)
     } else {
-        RoundedCornerShape(topStart = 0.dp, topEnd = 8.dp, bottomStart = 8.dp, bottomEnd = 8.dp)
+        RoundedCornerShape(topStart = topCorner, topEnd = 8.dp, bottomStart = 8.dp, bottomEnd = 8.dp)
     }
 
     val bubbleColor = if (isOutgoing) {

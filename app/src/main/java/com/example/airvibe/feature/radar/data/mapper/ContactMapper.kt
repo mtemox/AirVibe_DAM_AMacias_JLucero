@@ -25,6 +25,8 @@ object ContactMapper {
         accentColorArgb = accentColorArgb,
         isPremium = isPremium,
         premiumCatalog = premiumCatalog,
+        avatarUrl = avatarUrl,
+        avatarBase64 = avatarBase64,
         addedByPeer = addedByPeer,
         isSynced = isSynced,
         createdAt = createdAt,
@@ -42,6 +44,8 @@ object ContactMapper {
         accentColorArgb = accentColorArgb,
         isPremium = isPremium,
         premiumCatalog = premiumCatalog,
+        avatarUrl = avatarUrl,
+        avatarBase64 = avatarBase64,
         addedByPeer = addedByPeer,
         isSynced = false,
         createdAt = System.currentTimeMillis(),
@@ -62,6 +66,8 @@ object ContactMapper {
         accentHue = accentHueFrom(accentColorArgb),
         isPremium = isPremium,
         premiumCatalog = premiumCatalog,
+        avatarUrl = avatarUrl,
+        avatarBase64 = avatarBase64,
     )
 
     fun accentArgbFromProfile(profile: PersonProfile): Int =

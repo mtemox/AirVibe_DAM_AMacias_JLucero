@@ -26,5 +26,6 @@ object SupabaseClientFactory {
     ) {
         install(Auth)
         install(Postgrest)
+        install(io.github.jan.supabase.storage.Storage)
     }
 }

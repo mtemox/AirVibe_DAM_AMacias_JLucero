@@ -155,6 +155,18 @@ class ChatRepositoryImpl(
         gateway.sendRoomJoin(room.hostNodeId, room.id, room.title)
     }
 
+    override suspend fun sendRoomLeave(roomId: String) {
+        val room = roomRepository.getRoom(roomId) ?: return
+        if (room.isHost) return
+        gateway.sendRoomLeave(room.hostNodeId, room.id)
+    }
+
+    override suspend fun sendRoomDestroy(roomId: String) {
+        val room = roomRepository.getRoom(roomId) ?: return
+        if (!room.isHost) return
+        gateway.sendRoomDestroy(room.id)
+    }
+
     /**
      * Hook invocado por el [ChatMessageGateway] cuando llega un
      * mensaje entrante. Se persiste como [MessageKind.Text]

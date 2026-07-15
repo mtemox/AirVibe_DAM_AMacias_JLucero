@@ -93,7 +93,7 @@ fun BroadcastSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Create New Group",
+                    text = "Crear nuevo grupo",
                     style = MaterialTheme.typography.titleLarge.copy(
                         fontWeight = FontWeight.Bold,
                         fontSize = 22.sp
@@ -109,7 +109,7 @@ fun BroadcastSheet(
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.Close,
-                        contentDescription = "Close",
+                        contentDescription = "Cerrar",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -125,7 +125,7 @@ fun BroadcastSheet(
                 // Group Name Input
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        text = "Group Name",
+                        text = "Nombre del grupo",
                         style = MaterialTheme.typography.labelMedium.copy(fontSize = 14.sp),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(start = 4.dp)
@@ -133,7 +133,7 @@ fun BroadcastSheet(
                     OutlinedTextField(
                         value = message,
                         onValueChange = { message = it },
-                        placeholder = { Text("e.g. Coffee & Code Downtown", color = MaterialTheme.colorScheme.outline) },
+                        placeholder = { Text("ej. Café y Código en el Centro", color = MaterialTheme.colorScheme.outline) },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
@@ -174,12 +174,12 @@ fun BroadcastSheet(
                         Spacer(modifier = Modifier.width(16.dp))
                         Column {
                             Text(
-                                text = "Allow nearby users to join",
+                                text = "Permitir a usuarios cercanos unirse",
                                 style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, fontSize = 14.sp),
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = "Visible to users within a 500m radius",
+                                text = "Visible para usuarios en un radio de 500m",
                                 style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -225,7 +225,7 @@ fun BroadcastSheet(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = if (isBroadcasting) "Broadcasting..." else "Broadcast Invitation",
+                        text = if (isBroadcasting) "Transmitiendo..." else "Enviar invitación",
                         style = MaterialTheme.typography.labelLarge.copy(
                             fontWeight = FontWeight.Bold,
                             fontSize = 16.sp

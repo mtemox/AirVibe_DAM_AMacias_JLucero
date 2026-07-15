@@ -38,4 +38,6 @@ data class ScannerProfile(
     val isPremium: Boolean = false,
     val premiumCatalog: String? = null,
     val tags: List<String> = emptyList(),
+    val avatarUrl: String? = null,
+    val avatarBase64: String? = null,
 )

@@ -33,6 +33,8 @@ object NodeMapper {
         bio = bio,
         isPremium = isPremium,
         premiumCatalog = premiumCatalog,
+        avatarUrl = avatarUrl,
+        avatarBase64 = avatarBase64,
     )
 
     fun RadarNode.toEntity(
@@ -56,6 +58,8 @@ object NodeMapper {
         bio = bio,
         isPremium = isPremium,
         premiumCatalog = premiumCatalog,
+        avatarUrl = avatarUrl,
+        avatarBase64 = avatarBase64,
         isFavorite = isFavorite,
         isSynced = isSynced,
         updatedAt = updatedAt,
@@ -75,6 +79,8 @@ object NodeMapper {
         accentHue = accentHueFrom(accentColorArgb),
         isPremium = isPremium,
         premiumCatalog = premiumCatalog,
+        avatarUrl = avatarUrl,
+        avatarBase64 = avatarBase64,
     )
 
     private fun String.toNodeKind(): RadarNodeKind =

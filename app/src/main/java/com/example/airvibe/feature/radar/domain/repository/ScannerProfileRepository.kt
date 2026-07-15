@@ -51,6 +51,9 @@ interface ScannerProfileRepository {
      * necesidad de "hacer match".
      */
     suspend fun updatePremium(isPremium: Boolean, catalog: String? = null)
+    
+    /** Guarda la foto de perfil en versión URL (alta calidad) y en versión Base64 (Bluetooth) */
+    suspend fun updateAvatar(avatarUrl: String?, avatarBase64: String?)
 
     /** Sincroniza el nombre desde Supabase Auth si el usuario no lo editó. */
     suspend fun applyAuthDisplayName(displayName: String?)

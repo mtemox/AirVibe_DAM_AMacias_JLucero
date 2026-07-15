@@ -37,6 +37,7 @@ interface ChatDao {
         SELECT
             latest.node_id AS nodeId,
             COALESCE(n.display_name, latest.node_id) AS displayName,
+            n.avatar_base64 AS avatarBase64,
             m.text AS lastMessage,
             m.created_at AS lastTimestamp,
             m.kind AS kind,
@@ -134,4 +135,5 @@ data class ConversationSummaryRow(
     val direction: String,
     val isSynced: Boolean,
     val unreadCount: Int,
+    val avatarBase64: String?,
 )

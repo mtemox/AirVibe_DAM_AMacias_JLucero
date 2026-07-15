@@ -79,7 +79,7 @@ fun ServicesScreen(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             IconButton(onClick = { /* TODO */ }) {
-                Icon(imageVector = Icons.Rounded.Menu, contentDescription = "Menu", tint = MaterialTheme.colorScheme.primary)
+                Icon(imageVector = Icons.Rounded.Menu, contentDescription = "Menú", tint = MaterialTheme.colorScheme.primary)
             }
             Text(
                 text = "AirVibe",
@@ -92,7 +92,7 @@ fun ServicesScreen(
             // Profile Image Mock
             Image(
                 painter = painterResource(id = R.drawable.ic_launcher_background), // Fallback image
-                contentDescription = "Profile",
+                contentDescription = "Perfil",
                 modifier = Modifier
                     .size(40.dp)
                     .clip(CircleShape)
@@ -141,12 +141,12 @@ fun ServicesScreen(
         ) {
             Column {
                 Text(
-                    text = "Nearby Experts",
+                    text = "Expertos cercanos",
                     style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = "Found ${providers.size} available near you",
+                    text = "Encontramos ${providers.size} disponibles cerca de ti",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -154,13 +154,13 @@ fun ServicesScreen(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     imageVector = Icons.Rounded.FilterList,
-                    contentDescription = "Filter",
+                    contentDescription = "Filtrar",
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(20.dp)
                 )
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
-                    text = "Filter",
+                    text = "Filtrar",
                     style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
                     color = MaterialTheme.colorScheme.primary
                 )
@@ -241,7 +241,7 @@ fun ServicesScreen(
                                             .padding(horizontal = 8.dp, vertical = 2.dp)
                                     ) {
                                         Text(
-                                            text = "Available now",
+                                            text = "Disponible ahora",
                                             color = Color(0xFF006d39),
                                             style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium)
                                         )
@@ -262,7 +262,7 @@ fun ServicesScreen(
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(
                                     imageVector = Icons.Rounded.Star,
-                                    contentDescription = "Rating",
+                                    contentDescription = "Calificación",
                                     tint = Color(0xFFff7518),
                                     modifier = Modifier.size(16.dp)
                                 )

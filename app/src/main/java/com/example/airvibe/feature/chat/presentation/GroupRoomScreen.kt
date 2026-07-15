@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
@@ -15,14 +16,17 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Groups
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -43,6 +47,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.airvibe.core.designsystem.components.AirVibeAmbientBackground
 import com.example.airvibe.core.designsystem.components.AvatarMonogram
 import com.example.airvibe.core.designsystem.components.GlassPill
+import com.example.airvibe.core.ui.feedback.rememberUserMessages
 import com.example.airvibe.feature.chat.domain.model.RoomMessage
 import com.example.airvibe.feature.chat.presentation.components.ChatComposer
 import com.example.airvibe.feature.chat.presentation.components.ChatTopBar
@@ -65,6 +70,10 @@ fun GroupRoomScreen(
     val room = state.room
     var composer by remember { mutableStateOf("") }
     val loadError = state.loadError
+    var showMenu by remember { mutableStateOf(false) }
+    var showConfirmDialog by remember { mutableStateOf(false) }
+
+    val (snackbarHostState, snackbarFlow) = rememberUserMessages()
 
     Box(modifier = Modifier.fillMaxSize().background(Color(0xFFFFA84D))) {
         androidx.compose.foundation.Image(
@@ -85,8 +94,46 @@ fun GroupRoomScreen(
                 subtitle = room?.let { "Anfitrión: ${it.hostName}" },
                 badgeText = "Sala",
                 onBack = onBack,
+                onMore = { showMenu = true },
+                moreMenu = {
+                    androidx.compose.material3.DropdownMenu(
+                        expanded = showMenu,
+                        onDismissRequest = { showMenu = false },
+                    ) {
+                        androidx.compose.material3.DropdownMenuItem(
+                            text = { Text(if (room?.isHost == true) "Eliminar Grupo" else "Abandonar Grupo") },
+                            onClick = {
+                                showMenu = false
+                                showConfirmDialog = true
+                            }
+                        )
+                    }
+                }
             )
-
+            
+            if (showConfirmDialog) {
+                androidx.compose.material3.AlertDialog(
+                    onDismissRequest = { showConfirmDialog = false },
+                    title = { Text(if (room?.isHost == true) "Eliminar Grupo" else "Abandonar Grupo") },
+                    text = { Text(if (room?.isHost == true) "¿Estás seguro que deseas eliminar este grupo para todos los miembros?" else "¿Estás seguro que deseas abandonar este grupo?") },
+                    confirmButton = {
+                        androidx.compose.material3.TextButton(
+                            onClick = {
+                                showConfirmDialog = false
+                                viewModel.leaveOrDeleteRoom()
+                                onBack()
+                            }
+                        ) {
+                            Text("Sí")
+                        }
+                    },
+                    dismissButton = {
+                        androidx.compose.material3.TextButton(onClick = { showConfirmDialog = false }) {
+                            Text("Cancelar")
+                        }
+                    }
+                )
+            }
             when {
                 state.isLoading -> {
                     Box(
@@ -123,6 +170,8 @@ fun GroupRoomScreen(
                     // apilados por encima de la lista de mensajes.
                     RoomMembersHeader(
                         memberCount = state.memberCount,
+                        members = state.members,
+                        avatars = state.avatars,
                         hostName = room?.hostName.orEmpty(),
                     )
 
@@ -139,22 +188,33 @@ fun GroupRoomScreen(
                             top = 8.dp,
                             bottom = 8.dp,
                         ),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(2.dp),
                     ) {
-                        items(
+                        itemsIndexed(
                             // Pass reversed list so index 0 = newest = renders at bottom
                             items = state.messages.asReversed(),
-                            key = { it.id },
-                        ) { message ->
+                            key = { _, it -> it.id },
+                        ) { index, message ->
+                            val reversedMessages = state.messages.asReversed()
+                            val isAboveSameSender = if (index + 1 < reversedMessages.size) {
+                                reversedMessages[index + 1].senderNodeId == message.senderNodeId
+                            } else false
+
                             Row(
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = if (isAboveSameSender) 0.dp else 6.dp),
                                 horizontalArrangement = if (message.isOwn) {
                                     Arrangement.End
                                 } else {
                                     Arrangement.Start
                                 },
                             ) {
-                                RoomMessageBubble(message = message)
+                                RoomMessageBubble(
+                                    message = message,
+                                    isAboveSameSender = isAboveSameSender,
+                                    avatarBase64 = state.avatars[message.senderNodeId]
+                                )
                             }
                         }
                     }
@@ -176,16 +236,63 @@ fun GroupRoomScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
         }
+
+        // Overlay de carga al eliminar la sala. Mantiene la
+        // estética de la pantalla sin bloquear el flujo.
+        if (state.isDeleting) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.18f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    shadowElevation = 6.dp,
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                        Spacer(modifier = Modifier.size(12.dp))
+                        Text(
+                            text = "Eliminando…",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
+                }
+            }
+        }
+
+        rememberUserMessages(
+            flow = snackbarFlow,
+            host = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 12.dp),
+        )
     }
 }
 
 @Composable
-private fun RoomMessageBubble(message: RoomMessage) {
+private fun RoomMessageBubble(
+    message: RoomMessage,
+    isAboveSameSender: Boolean = false,
+    avatarBase64: String? = null,
+) {
     val maxBubbleWidth = (LocalConfiguration.current.screenWidthDp * 0.85f).dp
+    val topCorner = if (isAboveSameSender) 8.dp else 0.dp
     val bubbleShape = if (message.isOwn) {
-        RoundedCornerShape(topStart = 8.dp, topEnd = 0.dp, bottomStart = 8.dp, bottomEnd = 8.dp)
+        RoundedCornerShape(topStart = 8.dp, topEnd = topCorner, bottomStart = 8.dp, bottomEnd = 8.dp)
     } else {
-        RoundedCornerShape(topStart = 0.dp, topEnd = 8.dp, bottomStart = 8.dp, bottomEnd = 8.dp)
+        RoundedCornerShape(topStart = topCorner, topEnd = 8.dp, bottomStart = 8.dp, bottomEnd = 8.dp)
     }
     val bubbleColor = if (message.isOwn) {
         Color(0xFFDCF8C6)
@@ -208,12 +315,24 @@ private fun RoomMessageBubble(message: RoomMessage) {
                 modifier = Modifier.padding(end = if (message.isOwn) 48.dp else 36.dp, bottom = 8.dp)
             ) {
                 if (!message.isOwn) {
-                    Text(
-                        text = message.senderName,
-                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
-                        color = MaterialTheme.colorScheme.primary,
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.padding(bottom = 2.dp)
-                    )
+                    ) {
+                        if (!avatarBase64.isNullOrEmpty()) {
+                            AvatarMonogram(
+                                name = message.senderName,
+                                size = 16.dp,
+                                imageModel = avatarBase64,
+                            )
+                            androidx.compose.foundation.layout.Spacer(modifier = Modifier.size(4.dp))
+                        }
+                        Text(
+                            text = message.senderName,
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
                 }
                 Text(
                     text = message.text,
@@ -253,7 +372,7 @@ private fun RoomMessageMetaBox(
         if (isOwn) {
             Icon(
                 imageVector = Icons.Rounded.Check,
-                contentDescription = "Sent",
+                contentDescription = "Enviado",
                 tint = Color(0xFF888888),
                 modifier = Modifier.size(14.dp),
             )
@@ -270,6 +389,8 @@ private fun groupRoomViewModel(roomId: String): GroupRoomViewModel {
 @Composable
 private fun RoomMembersHeader(
     memberCount: Int,
+    members: List<com.example.airvibe.feature.chat.domain.model.RoomMember>,
+    avatars: Map<String, String>,
     hostName: String,
 ) {
     if (memberCount <= 0 && hostName.isBlank()) return
@@ -318,8 +439,9 @@ private fun RoomMembersHeader(
             Row(
                 horizontalArrangement = Arrangement.spacedBy((-6).dp),
             ) {
-                repeat(3) { index ->
-                    val label = if (index == 0) hostName else "Invitado ${index + 1}"
+                val displayMembers = members.take(3)
+                displayMembers.forEachIndexed { index, member ->
+                    val label = member.displayName.ifBlank { "Invitado ${index + 1}" }
                     Box(
                         modifier = Modifier
                             .size(24.dp)
@@ -330,6 +452,7 @@ private fun RoomMembersHeader(
                         AvatarMonogram(
                             name = label,
                             size = 24.dp,
+                            imageModel = avatars[member.nodeId],
                         )
                     }
                 }

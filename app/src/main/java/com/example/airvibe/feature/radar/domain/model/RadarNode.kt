@@ -61,6 +61,8 @@ data class RadarNode(
     val bio: String = "",
     val isPremium: Boolean = false,
     val premiumCatalog: String? = null,
+    val avatarUrl: String? = null,
+    val avatarBase64: String? = null,
 ) {
     init {
         require(angleDegrees in 0f..360f) { "angleDegrees must be in 0..360" }

@@ -93,7 +93,8 @@ data class MockChat(
     val message: String,
     val time: String,
     val unreadCount: Int = 0,
-    val isGroup: Boolean = false
+    val isGroup: Boolean = false,
+    val avatarBase64: String? = null
 )
 
 private object RadarDefaults {
@@ -148,7 +149,7 @@ fun RadarChatsScreen(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             IconButton(onClick = onMenuClick) {
-                Icon(imageVector = Icons.Rounded.Menu, contentDescription = "Menu")
+                Icon(imageVector = Icons.Rounded.Menu, contentDescription = "Menú")
             }
             Text(
                 text = "AirVibe",
@@ -158,15 +159,37 @@ fun RadarChatsScreen(
                     fontSize = 24.sp
                 )
             )
-            // Profile Image Mock
-            Image(
-                painter = painterResource(id = R.drawable.ic_launcher_background), // Fallback image
-                contentDescription = "Profile",
+            // Profile Image
+            val profile by com.example.airvibe.core.di.ServiceLocator.scannerProfileRepository.observe()
+                .collectAsStateWithLifecycle(initialValue = null)
+
+            Box(
                 modifier = Modifier
                     .size(40.dp)
                     .clip(CircleShape)
                     .background(Color.LightGray)
-            )
+                    .clickable { onMenuClick() },
+                contentAlignment = Alignment.Center
+            ) {
+                if (profile?.avatarBase64 != null) {
+                    com.example.airvibe.core.designsystem.components.AvatarMonogram(
+                        name = profile?.displayName ?: "?",
+                        size = 40.dp,
+                        imageModel = profile?.avatarBase64
+                    )
+                } else if (profile != null) {
+                    com.example.airvibe.core.designsystem.components.AvatarMonogram(
+                        name = profile?.displayName ?: "?",
+                        size = 40.dp
+                    )
+                } else {
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_launcher_background), // Fallback image
+                        contentDescription = "Perfil",
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+            }
         }
 
         // Radar Area (Mock)
@@ -177,6 +200,9 @@ fun RadarChatsScreen(
                 .then(if (!isRadarExpanded) Modifier.clickable { isRadarExpanded = true } else Modifier),
             contentAlignment = Alignment.Center
         ) {
+            // Map Background with Grid
+            RadarMapBackground()
+
             // Concentric circles
             Box(modifier = Modifier.size(240.dp).border(1.dp, Color.LightGray.copy(alpha=0.3f), CircleShape))
             Box(modifier = Modifier.size(160.dp).border(1.dp, Color.LightGray.copy(alpha=0.5f), CircleShape))
@@ -211,7 +237,7 @@ fun RadarChatsScreen(
                 contentAlignment = Alignment.Center
             ) {
                 if (isRadarExpanded) {
-                    Icon(imageVector = Icons.Rounded.Search, contentDescription = "Scan", tint = Color.White, modifier = Modifier.size(24.dp))
+                    Icon(imageVector = Icons.Rounded.Search, contentDescription = "Escanear", tint = Color.White, modifier = Modifier.size(24.dp))
                 } else {
                     Box(
                         modifier = Modifier
@@ -229,7 +255,7 @@ fun RadarChatsScreen(
                         .padding(bottom = 32.dp)
                         .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
                 ) {
-                    Icon(imageVector = Icons.Rounded.KeyboardArrowDown, contentDescription = "Shrink Radar")
+                    Icon(imageVector = Icons.Rounded.KeyboardArrowDown, contentDescription = "Reducir radar")
                 }
             }
 
@@ -264,7 +290,7 @@ fun RadarChatsScreen(
                     val peerColor = if (radarState.proximityCount > 0) androidx.compose.ui.graphics.Color(0xFF4CAF50) else androidx.compose.ui.graphics.Color(0xFFFFA84D)
                     Box(modifier = Modifier.size(8.dp).background(peerColor, CircleShape))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text(text = "${radarState.proximityCount} Peers Nearby", style = MaterialTheme.typography.labelMedium)
+                    Text(text = "${radarState.proximityCount} peers cercanos", style = MaterialTheme.typography.labelMedium)
                 }
             }
         }
@@ -311,13 +337,17 @@ fun RadarChatsScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             if (chat.isGroup) {
-                                Icon(imageVector = Icons.Rounded.Person, contentDescription = "Group", tint = MaterialTheme.colorScheme.primary)
+                                Icon(imageVector = Icons.Rounded.Person, contentDescription = "Grupo", tint = MaterialTheme.colorScheme.primary)
+                            } else if (!chat.avatarBase64.isNullOrEmpty()) {
+                                com.example.airvibe.core.designsystem.components.AvatarMonogram(
+                                    name = chat.name,
+                                    size = 56.dp,
+                                    imageModel = chat.avatarBase64
+                                )
                             } else {
-                                Image(
-                                    painter = painterResource(id = R.drawable.ic_launcher_background),
-                                    contentDescription = null,
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentScale = ContentScale.Crop
+                                com.example.airvibe.core.designsystem.components.AvatarMonogram(
+                                    name = chat.name,
+                                    size = 56.dp
                                 )
                             }
                         }
@@ -386,9 +416,9 @@ fun RadarChatsScreen(
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(imageVector = Icons.Rounded.Lock, contentDescription = "Encrypted", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                        Icon(imageVector = Icons.Rounded.Lock, contentDescription = "Cifrado", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text(text = "End-to-end encrypted locally", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                        Text(text = "Cifrado de extremo a extremo en local", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                     }
                 }
             }
@@ -441,6 +471,7 @@ private fun ConversationSummary.toMockChat(): MockChat = MockChat(
     time = lastTimestamp.toChatTimestamp(),
     unreadCount = unreadCount,
     isGroup = isGroupInvite,
+    avatarBase64 = avatarBase64,
 )
 
 private fun Long.toChatTimestamp(): String {
@@ -462,7 +493,7 @@ private fun Long.toChatTimestamp(): String {
 
     return when {
         sameDay -> SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(this))
-        sameYesterday -> "Yesterday"
+        sameYesterday -> "Ayer"
         sameWeek -> SimpleDateFormat("EEE", Locale.getDefault()).format(Date(this))
         sameYear -> SimpleDateFormat("MMM d", Locale.getDefault()).format(Date(this))
         else -> SimpleDateFormat("MM/dd/yy", Locale.getDefault()).format(Date(this))
@@ -488,4 +519,55 @@ private fun radarViewModel(): com.example.airvibe.feature.radar.presentation.Rad
     }
     return androidx.lifecycle.viewmodel.compose.viewModel(factory = factory)
 }
+
+@Composable
+fun RadarMapBackground(modifier: Modifier = Modifier.fillMaxSize()) {
+    val surfaceColor = androidx.compose.material3.MaterialTheme.colorScheme.surface
+    val gridColor = androidx.compose.material3.MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
+
+    androidx.compose.foundation.Canvas(modifier = modifier) {
+        val width = size.width
+        val height = size.height
+        
+        // Base surface
+        drawRect(surfaceColor)
+        
+        // 1. Grid
+        val gridSize = 60.dp.toPx()
+        
+        // Horizontal lines
+        var y = 0f
+        while (y < height) {
+            drawLine(
+                color = gridColor,
+                start = androidx.compose.ui.geometry.Offset(0f, y),
+                end = androidx.compose.ui.geometry.Offset(width, y),
+                strokeWidth = 3.dp.toPx() // Thicker, noticeable line
+            )
+            y += gridSize
+        }
+        
+        // Vertical lines
+        var x = 0f
+        while (x < width) {
+            drawLine(
+                color = gridColor,
+                start = androidx.compose.ui.geometry.Offset(x, 0f),
+                end = androidx.compose.ui.geometry.Offset(x, height),
+                strokeWidth = 3.dp.toPx()
+            )
+            x += gridSize
+        }
+
+        // 2. Elegant Vignette (Fades perfectly to the app's surface color at the edges)
+        drawRect(
+            brush = androidx.compose.ui.graphics.Brush.radialGradient(
+                colors = listOf(Color.Transparent, surfaceColor.copy(alpha = 0.7f), surfaceColor),
+                center = androidx.compose.ui.geometry.Offset(width / 2f, height / 2f),
+                radius = minOf(width, height) / 1.3f
+            )
+        )
+    }
+}
+
 

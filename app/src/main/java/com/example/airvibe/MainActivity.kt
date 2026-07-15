@@ -29,6 +29,11 @@ import com.example.airvibe.core.di.ServiceLocator
 import com.example.airvibe.feature.auth.presentation.components.SplashScreen
 import com.example.airvibe.feature.auth.presentation.components.OnboardingScreen
 import com.example.airvibe.feature.chat.domain.state.ActiveChatState
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 
 class MainActivity : ComponentActivity() {
 
@@ -155,48 +160,76 @@ private fun AirVibeApp(
                         )
                     }
                 }
-                AuthStatus.SignedIn -> when (val target = chatTarget) {
-                    ChatTarget.Closed -> com.example.airvibe.feature.main.presentation.MainScreen(
-                        radarContent = { onMenuClick ->
-                            com.example.airvibe.feature.radar.presentation.RadarChatsScreen(
+                AuthStatus.SignedIn -> {
+                    AnimatedContent(
+                        targetState = chatTarget,
+                        transitionSpec = {
+                            if (targetState is ChatTarget.ActiveChat || targetState is ChatTarget.ActiveRoom || targetState is ChatTarget.List) {
+                                // Slide in from right when going deeper
+                                slideInHorizontally(
+                                    animationSpec = tween(300),
+                                    initialOffsetX = { fullWidth -> fullWidth }
+                                ) togetherWith slideOutHorizontally(
+                                    animationSpec = tween(300),
+                                    targetOffsetX = { fullWidth -> -fullWidth }
+                                )
+                            } else {
+                                // Slide in from left when returning to main screen
+                                slideInHorizontally(
+                                    animationSpec = tween(300),
+                                    initialOffsetX = { fullWidth -> -fullWidth }
+                                ) togetherWith slideOutHorizontally(
+                                    animationSpec = tween(300),
+                                    targetOffsetX = { fullWidth -> fullWidth }
+                                )
+                            }
+                        },
+                        label = "ChatTargetAnimation"
+                    ) { target ->
+                        when (target) {
+                            ChatTarget.Closed -> com.example.airvibe.feature.main.presentation.MainScreen(
+                                radarContent = { onMenuClick ->
+                                    com.example.airvibe.feature.radar.presentation.RadarChatsScreen(
+                                        onOpenChat = { nodeId -> chatTarget = ChatTarget.ActiveChat(nodeId) },
+                                        onMenuClick = onMenuClick
+                                    )
+                                },
+                                servicesContent = {
+                                    com.example.airvibe.feature.services.presentation.ServicesScreen()
+                                },
+                                groupsContent = {
+                                    com.example.airvibe.feature.groups.presentation.GroupsScreen(
+                                        onOpenRoom = { roomId -> chatTarget = ChatTarget.ActiveRoom(roomId) }
+                                    )
+                                },
+                                profileContent = {
+                                    com.example.airvibe.feature.profile.presentation.ProfileScreen()
+                                }
+                            )
+                            ChatTarget.List -> ConversationsListScreen(
+                                onBack = { chatTarget = ChatTarget.Closed },
+                                onOpenConversation = { nodeId ->
+                                    chatTarget = ChatTarget.ActiveChat(nodeId)
+                                },
+                            )
+                            ChatTarget.Friends -> FriendsScreen(
+                                onBack = { chatTarget = ChatTarget.Closed },
                                 onOpenChat = { nodeId -> chatTarget = ChatTarget.ActiveChat(nodeId) },
-                                onMenuClick = onMenuClick
                             )
-                        },
-                        servicesContent = {
-                            com.example.airvibe.feature.services.presentation.ServicesScreen()
-                        },
-                        groupsContent = {
-                            com.example.airvibe.feature.groups.presentation.GroupsScreen(
-                                onOpenRoom = { roomId -> chatTarget = ChatTarget.ActiveRoom(roomId) }
+                            ChatTarget.RoomsList -> RoomsListScreen(
+                                onBack = { chatTarget = ChatTarget.Closed },
+                                onOpenRoom = { roomId -> chatTarget = ChatTarget.ActiveRoom(roomId) },
                             )
-                        },
-                        profileContent = {
-                            com.example.airvibe.feature.profile.presentation.ProfileScreen()
+                            is ChatTarget.ActiveChat -> ChatScreen(
+                                peerNodeId = target.peerNodeId,
+                                onBack = { chatTarget = ChatTarget.Closed },
+                            )
+                            is ChatTarget.ActiveRoom -> GroupRoomScreen(
+                                roomId = target.roomId,
+                                onBack = { chatTarget = ChatTarget.Closed },
+                            )
                         }
-                    )
-                    ChatTarget.List -> ConversationsListScreen(
-                        onBack = { chatTarget = ChatTarget.Closed },
-                        onOpenConversation = { nodeId ->
-                            chatTarget = ChatTarget.ActiveChat(nodeId)
-                        },
-                    )
-                    ChatTarget.Friends -> FriendsScreen(
-                        onBack = { chatTarget = ChatTarget.Closed },
-                        onOpenChat = { nodeId -> chatTarget = ChatTarget.ActiveChat(nodeId) },
-                    )
-                    ChatTarget.RoomsList -> RoomsListScreen(
-                        onBack = { chatTarget = ChatTarget.Closed },
-                        onOpenRoom = { roomId -> chatTarget = ChatTarget.ActiveRoom(roomId) },
-                    )
-                    is ChatTarget.ActiveChat -> ChatScreen(
-                        peerNodeId = target.peerNodeId,
-                        onBack = { chatTarget = ChatTarget.Closed },
-                    )
-                    is ChatTarget.ActiveRoom -> GroupRoomScreen(
-                        roomId = target.roomId,
-                        onBack = { chatTarget = ChatTarget.Closed },
-                    )
+                    }
                 }
             }
         }

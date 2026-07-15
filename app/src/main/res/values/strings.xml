@@ -68,4 +68,23 @@
     <string name="handshake_request_sheet_body">%1$s quiere agregar a AirVibe contigo. Al aceptar, ambos perfiles se guardarán en sus contactos.</string>
     <string name="handshake_banner_incoming">Tienes %1$d solicitud(es) de conexión</string>
     <string name="handshake_banner_view">Ver</string>
+
+    <!-- Feedback de acciones de UI (snackbars) -->
+    <string name="feedback_profile_saving">Guardando perfil…</string>
+    <string name="feedback_profile_saved">Perfil actualizado correctamente</string>
+    <string name="feedback_profile_save_error">No se pudo guardar el perfil</string>
+    <string name="feedback_avatar_uploading">Subiendo foto de perfil…</string>
+    <string name="feedback_avatar_uploaded">Foto de perfil actualizada</string>
+    <string name="feedback_avatar_upload_error">No se pudo subir la foto de perfil</string>
+    <string name="feedback_room_creating">Creando sala…</string>
+    <string name="feedback_room_created">Sala creada, esperando a los primeros miembros</string>
+    <string name="feedback_room_create_error">No se pudo crear la sala. Inténtalo de nuevo.</string>
+    <string name="feedback_room_deleting">Eliminando sala…</string>
+    <string name="feedback_room_deleted">Sala eliminada</string>
+    <string name="feedback_room_delete_error">No se pudo eliminar la sala</string>
+    <string name="feedback_chat_connecting">Conectando con %1$s…</string>
+    <string name="feedback_chat_connected">Conectado con %1$s</string>
+    <string name="feedback_chat_connection_error">No se pudo conectar con %1$s. Estará disponible cuando vuelva a estar en línea.</string>
+    <string name="feedback_chat_message_sent">Mensaje enviado</string>
+    <string name="feedback_chat_message_error">No se pudo enviar el mensaje</string>
 </resources>

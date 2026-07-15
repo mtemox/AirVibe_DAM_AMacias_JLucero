@@ -48,6 +48,12 @@ data class SavedContactEntity(
 
     @ColumnInfo(name = "premium_catalog")
     val premiumCatalog: String? = null,
+    
+    @ColumnInfo(name = "avatar_url")
+    val avatarUrl: String? = null,
+    
+    @ColumnInfo(name = "avatar_base64")
+    val avatarBase64: String? = null,
 
     @ColumnInfo(name = "added_by_peer")
     val addedByPeer: Boolean = false,
