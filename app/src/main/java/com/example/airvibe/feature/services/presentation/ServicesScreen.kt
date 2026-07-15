@@ -68,7 +68,7 @@ fun ServicesScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.White)
+            .background(MaterialTheme.colorScheme.background)
     ) {
         // Top App Bar Area
         Row(
@@ -205,7 +205,7 @@ fun ServicesScreen(
                                 modifier = Modifier
                                     .align(Alignment.BottomEnd)
                                     .size(16.dp)
-                                    .background(Color.White, CircleShape)
+                                    .background(MaterialTheme.colorScheme.surface, CircleShape)
                                     .padding(2.dp)
                             ) {
                                 Box(

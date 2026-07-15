@@ -86,18 +86,89 @@ fun ProfileScreen(
     val stats by viewModel.stats.collectAsStateWithLifecycle()
     val isUpdating by viewModel.isUpdating.collectAsStateWithLifecycle()
     val visibility by viewModel.visibility.collectAsStateWithLifecycle()
+    val currentTheme by viewModel.currentTheme.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     var isEditSheetVisible by remember { mutableStateOf(false) }
+    var isThemeSheetVisible by remember { mutableStateOf(false) }
     val editSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val themeSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     val (snackbarHostState, snackbarFlow) = rememberUserMessages()
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
+        
+        // Background Pattern (Auth-style wavy lines, but with colored lines)
+        // Extract colors before the Canvas block (which is not @Composable)
+        val primaryColor = androidx.compose.material3.MaterialTheme.colorScheme.primary
+        val tertiaryColor = androidx.compose.material3.MaterialTheme.colorScheme.tertiary
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(320.dp)
+        ) {
+            androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
+                val width = size.width
+                val height = size.height
+                
+                // Un gradiente para darle el "colorsito" chévere a las líneas
+                val lineBrush = Brush.linearGradient(
+                    colors = listOf(
+                        primaryColor.copy(alpha = 0.5f),
+                        tertiaryColor.copy(alpha = 0.3f)
+                    )
+                )
+
+                val patternPath = androidx.compose.ui.graphics.Path().apply {
+                    var yOffset = -height * 0.2f
+                    while (yOffset < height * 1.5f) {
+                        moveTo(-width * 0.2f, yOffset)
+                        cubicTo(
+                            width * 0.3f, yOffset - height * 0.3f,
+                            width * 0.7f, yOffset + height * 0.4f,
+                            width * 1.2f, yOffset - height * 0.1f
+                        )
+                        yOffset += height * 0.12f
+                    }
+                    var xOffset = -width * 0.5f
+                    while (xOffset < width * 1.5f) {
+                        moveTo(xOffset, -height * 0.2f)
+                        cubicTo(
+                            xOffset + width * 0.3f, height * 0.2f,
+                            xOffset - width * 0.2f, height * 0.6f,
+                            xOffset + width * 0.4f, height * 1.2f
+                        )
+                        xOffset += width * 0.2f
+                    }
+                }
+                drawPath(
+                    path = patternPath,
+                    brush = lineBrush,
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = 4f)
+                )
+            }
+            
+            // Fade-out to the surface color at the bottom so the lines disappear suavemente
+            val surfaceColor = androidx.compose.material3.MaterialTheme.colorScheme.surface
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                androidx.compose.ui.graphics.Color.Transparent,
+                                surfaceColor.copy(alpha = 0.6f),
+                                surfaceColor
+                            )
+                        )
+                    )
+            )
+        }
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.White)
         ) {
         // Top App Bar Area
         Row(
@@ -134,9 +205,9 @@ fun ProfileScreen(
             // Avatar
             Box(
                 modifier = Modifier
-                    .size(96.dp)
+                    .size(112.dp)
                     .clip(CircleShape)
-                    .border(4.dp, Color.White, CircleShape)
+                    .border(4.dp, MaterialTheme.colorScheme.surface, CircleShape)
                     .background(Color.LightGray),
                 contentAlignment = Alignment.Center
             ) {
@@ -153,7 +224,7 @@ fun ProfileScreen(
                         text = profile.displayName.firstOrNull()?.uppercase() ?: "?",
                         style = MaterialTheme.typography.headlineLarge.copy(
                             fontWeight = FontWeight.Bold,
-                            fontSize = 40.sp,
+                            fontSize = 44.sp,
                         ),
                         color = MaterialTheme.colorScheme.onBackground,
                     )
@@ -268,7 +339,13 @@ fun ProfileScreen(
                 SettingsItem(icon = Icons.Rounded.Person, title = "Cuenta", subtitle = "Notificaciones de seguridad, cambiar número")
                 SettingsItem(icon = Icons.Rounded.Lock, title = "Privacidad", subtitle = "Contactos bloqueados, mensajes temporales")
                 SettingsItem(icon = Icons.Rounded.Notifications, title = "Notificaciones", subtitle = "Tonos de mensajes, grupos y llamadas")
-                SettingsItem(icon = Icons.Rounded.Palette, title = "Apariencia", subtitle = "Tema del chat, fondos de pantalla")
+                SettingsItem(
+                    icon = Icons.Rounded.Palette,
+                    title = "Apariencia",
+                    subtitle = "Tema del chat, fondos de pantalla",
+                    onClick = { isThemeSheetVisible = true }
+                )
+                Spacer(modifier = Modifier.height(12.dp))
                 SettingsItem(icon = Icons.Rounded.Help, title = "Centro de ayuda", subtitle = "Preguntas frecuentes, contáctanos, política de privacidad")
             }
 
@@ -355,6 +432,23 @@ fun ProfileScreen(
             )
         }
     }
+
+    if (isThemeSheetVisible) {
+        ModalBottomSheet(
+            onDismissRequest = { isThemeSheetVisible = false },
+            sheetState = themeSheetState,
+            containerColor = MaterialTheme.colorScheme.surface,
+            scrimColor = Color.Black.copy(alpha = 0.45f)
+        ) {
+            com.example.airvibe.feature.profile.presentation.components.ThemeSelectionSheet(
+                currentTheme = currentTheme,
+                onSave = { theme ->
+                    viewModel.updateTheme(theme)
+                    isThemeSheetVisible = false
+                }
+            )
+        }
+    }
 }
 
 private fun shareProfile(
@@ -383,7 +477,7 @@ private fun shareProfile(
 fun StatCard(value: String, label: String, modifier: Modifier = Modifier) {
     Card(
         modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
         shape = RoundedCornerShape(12.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
@@ -408,13 +502,13 @@ fun StatCard(value: String, label: String, modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun SettingsItem(icon: ImageVector, title: String, subtitle: String) {
+fun SettingsItem(icon: ImageVector, title: String, subtitle: String, onClick: () -> Unit = {}) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
-            .background(Color.White, RoundedCornerShape(12.dp))
-            .clickable { }
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp))
+            .clickable { onClick() }
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -576,7 +670,7 @@ private fun VisibilityStatTile(
     Column(
         modifier = modifier
             .background(
-                color = Color.White,
+                color = MaterialTheme.colorScheme.surface,
                 shape = RoundedCornerShape(14.dp),
             )
             .border(

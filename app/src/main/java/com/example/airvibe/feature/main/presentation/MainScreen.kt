@@ -102,16 +102,11 @@ fun MainScreen(
 
         Scaffold(
             bottomBar = {
-                NavigationBar {
-                    MainTab.values().forEach { tab ->
-                        NavigationBarItem(
-                            selected = currentTab == tab,
-                            onClick = { currentTab = tab },
-                            icon = { Icon(imageVector = tab.icon, contentDescription = tab.title) },
-                            label = { Text(text = tab.title, fontWeight = FontWeight.SemiBold) }
-                        )
-                    }
-                }
+                com.example.airvibe.feature.main.presentation.components.AnimatedNavigationBar(
+                    tabs = MainTab.values(),
+                    currentTab = currentTab,
+                    onTabSelected = { currentTab = it }
+                )
             }
         ) { paddingValues ->
             Box(modifier = Modifier.padding(paddingValues)) {

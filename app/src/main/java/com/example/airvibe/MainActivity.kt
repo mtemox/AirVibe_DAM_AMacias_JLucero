@@ -101,7 +101,13 @@ private fun AirVibeApp(
     onDeepLinkHandled: () -> Unit = {},
 ) {
     val authStatus by ServiceLocator.authRepository.status.collectAsStateWithLifecycle()
-    val darkTheme = remember { false }
+    val appTheme by ServiceLocator.appPreferencesRepository.getAppTheme().collectAsStateWithLifecycle(initialValue = com.example.airvibe.core.preferences.domain.AppTheme.SYSTEM)
+    val isSystemDark = androidx.compose.foundation.isSystemInDarkTheme()
+    val darkTheme = when (appTheme) {
+        com.example.airvibe.core.preferences.domain.AppTheme.LIGHT -> false
+        com.example.airvibe.core.preferences.domain.AppTheme.DARK -> true
+        com.example.airvibe.core.preferences.domain.AppTheme.SYSTEM -> isSystemDark
+    }
     var chatTarget by rememberSaveable(stateSaver = ChatTarget.Saver) {
         mutableStateOf(
             when (initialDeepLink) {

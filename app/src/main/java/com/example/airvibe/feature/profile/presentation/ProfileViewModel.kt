@@ -56,6 +56,7 @@ class ProfileViewModel(
     roomRepository: ProximityRoomRepository = ServiceLocator.proximityRoomRepository,
     savedContactDao: SavedContactDao = ServiceLocator.savedContactDao,
     private val avatarRemoteDataSource: com.example.airvibe.feature.radar.data.remote.SupabaseAvatarDataSource = ServiceLocator.avatarRemoteDataSource,
+    private val appPreferencesRepository: com.example.airvibe.core.preferences.domain.AppPreferencesRepository = ServiceLocator.appPreferencesRepository,
 ) : ViewModel() {
 
     class Factory(
@@ -97,6 +98,17 @@ class ProfileViewModel(
 
     init {
         observeAuthForVisibility()
+    }
+
+    val currentTheme: StateFlow<com.example.airvibe.core.preferences.domain.AppTheme> = appPreferencesRepository.getAppTheme()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = com.example.airvibe.core.preferences.domain.AppTheme.SYSTEM
+        )
+
+    fun updateTheme(theme: com.example.airvibe.core.preferences.domain.AppTheme) {
+        appPreferencesRepository.setAppTheme(theme)
     }
 
     private fun observeAuthForVisibility() {

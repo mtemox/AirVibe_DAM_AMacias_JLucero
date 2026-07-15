@@ -94,17 +94,17 @@ internal val AirVibeDarkColors = darkColorScheme(
     tertiaryContainer = Color(0xFF004d62),
     onTertiaryContainer = Color(0xFFbaeaff),
 
-    background = Color(0xFF1a1c1c),
-    onBackground = Color(0xFFf9f9f9),
+    background = Color(0xFF09090b),
+    onBackground = Color(0xFFfafafa),
 
-    surface = Color(0xFF2f3131),
-    onSurface = Color(0xFFf0f1f1),
-    surfaceVariant = Color(0xFF444655),
-    onSurfaceVariant = Color(0xFFc4c5d7),
+    surface = Color(0xFF18181b),
+    onSurface = Color(0xFFfafafa),
+    surfaceVariant = Color(0xFF27272a),
+    onSurfaceVariant = Color(0xFFd4d4d8),
     surfaceTint = Color(0xFFb8c3ff),
 
-    outline = Color(0xFF8e90a0),
-    outlineVariant = Color(0xFF444655),
+    outline = Color(0xFF71717a),
+    outlineVariant = Color(0xFF3f3f46),
     error = Color(0xFFffdad6),
     onError = Color(0xFF93000a),
 )

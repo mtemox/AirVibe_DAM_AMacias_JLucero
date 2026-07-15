@@ -53,7 +53,7 @@ fun ChatTopBar(
             .fillMaxWidth()
             .height(64.dp)
             .shadow(elevation = 2.dp)
-            .background(Color.White)
+            .background(MaterialTheme.colorScheme.surface)
             .padding(horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
@@ -66,7 +66,7 @@ fun ChatTopBar(
                 Icon(
                     imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
                     contentDescription = "Atrás",
-                    tint = Color(0xFF444655)
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             
@@ -90,11 +90,11 @@ fun ChatTopBar(
                 Text(
                     text = peerDisplayName,
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Normal, fontSize = 18.sp),
-                    color = Color(0xFF1A1C1C)
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
                     text = if (isConnected) "en línea" else "sin conexión",
-                    color = Color(0xFF444655),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium)
                 )
             }
@@ -105,14 +105,14 @@ fun ChatTopBar(
                 Icon(
                     imageVector = Icons.Rounded.Videocam,
                     contentDescription = "Videollamada",
-                    tint = Color(0xFF444655)
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             IconButton(onClick = { /* TODO Call */ }) {
                 Icon(
                     imageVector = Icons.Rounded.Call,
                     contentDescription = "Llamada",
-                    tint = Color(0xFF444655)
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             Box {
@@ -120,7 +120,7 @@ fun ChatTopBar(
                     Icon(
                         imageVector = Icons.Rounded.MoreVert,
                         contentDescription = "Más",
-                        tint = Color(0xFF444655)
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 moreMenu()

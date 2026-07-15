@@ -113,12 +113,11 @@ fun OwnProfileSheet(
     }
 
     // Colores Vibe Pure
-    val surfaceColor = Color(0xFFFFFFFF)
-    val backgroundGray = Color(0xFFF9F9F9)
-    val borderColor = Color(0xFFE2E2E2)
-    val primaryColor = MaterialTheme.colorScheme.primary
-    val onSurfaceColor = Color(0xFF1A1C1C)
-    val onSurfaceVariant = Color(0xFF444655)
+    val surfaceColor = MaterialTheme.colorScheme.surface
+    val backgroundGray = MaterialTheme.colorScheme.background
+    val borderColor = MaterialTheme.colorScheme.outlineVariant
+    val onSurfaceColor = MaterialTheme.colorScheme.onSurface
+    val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
 
     Column(
         modifier = modifier
@@ -378,10 +377,12 @@ fun VibeTextField(
             maxLines = if (minLines > 1) 5 else 1,
             shape = RoundedCornerShape(12.dp),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = Color.White,
-                unfocusedContainerColor = Color.White,
+                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
                 focusedBorderColor = MaterialTheme.colorScheme.primary,
-                unfocusedBorderColor = Color(0xFFE2E2E2)
+                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                unfocusedTextColor = MaterialTheme.colorScheme.onSurface
             ),
             modifier = Modifier.fillMaxWidth()
         )
@@ -398,7 +399,7 @@ fun BentoStatusCard(
     modifier: Modifier = Modifier
 ) {
     val borderColor = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent
-    val bgColor = Color.White
+    val bgColor = MaterialTheme.colorScheme.surfaceVariant
 
     Box(
         modifier = modifier
@@ -413,7 +414,7 @@ fun BentoStatusCard(
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelMedium.copy(fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal),
-                color = Color(0xFF1A1C1C),
+                color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -427,8 +428,8 @@ fun GroupedList(content: @Composable ColumnScope.() -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .background(Color.White)
-            .border(1.dp, Color(0xFFE2E2E2), RoundedCornerShape(16.dp)),
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(16.dp)),
         content = content
     )
 }
@@ -458,10 +459,10 @@ fun GroupedListItem(
                 Icon(imageVector = icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(20.dp))
             }
             Column {
-                Text(text = title, style = MaterialTheme.typography.bodyLarge.copy(color = Color(0xFF1A1C1C)))
-                Text(text = subtitle, style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFF747686)))
+                Text(title, style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.onSurface)
+                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
-        Icon(imageVector = Icons.Rounded.ChevronRight, contentDescription = null, tint = Color(0xFF747686))
+        Icon(imageVector = Icons.Rounded.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

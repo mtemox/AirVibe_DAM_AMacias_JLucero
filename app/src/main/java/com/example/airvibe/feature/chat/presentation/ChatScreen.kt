@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -67,13 +68,23 @@ fun ChatScreen(
 
     val (snackbarHostState, snackbarFlow) = rememberUserMessages()
 
-    Box(modifier = Modifier.fillMaxSize().background(Color(0xFFE8ECEF))) {
+    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val bgColor = if (isDark) MaterialTheme.colorScheme.background else Color(0xFFE8ECEF)
+
+    Box(modifier = Modifier.fillMaxSize().background(bgColor)) {
+        val invertMatrix = androidx.compose.ui.graphics.ColorMatrix(floatArrayOf(
+            -1f, 0f, 0f, 0f, 255f,
+            0f, -1f, 0f, 0f, 255f,
+            0f, 0f, -1f, 0f, 255f,
+            0f, 0f, 0f, 1f, 0f
+        ))
         Image(
             painter = painterResource(id = R.drawable.wave_pattern),
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize(),
-            alpha = 0.5f
+            alpha = if (isDark) 0.15f else 0.5f,
+            colorFilter = if (isDark) androidx.compose.ui.graphics.ColorFilter.colorMatrix(invertMatrix) else null
         )
 
         Column(

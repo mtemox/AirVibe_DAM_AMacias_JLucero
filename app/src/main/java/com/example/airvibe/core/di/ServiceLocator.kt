@@ -17,6 +17,8 @@ import com.example.airvibe.feature.chat.data.repository.ChatRepositoryImpl
 import com.example.airvibe.feature.chat.data.repository.MatchPreferencesRepositoryImpl
 import com.example.airvibe.feature.chat.domain.repository.ChatRepository
 import com.example.airvibe.feature.chat.domain.repository.MatchPreferencesRepository
+import com.example.airvibe.core.preferences.domain.AppPreferencesRepository
+import com.example.airvibe.core.preferences.data.AppPreferencesRepositoryImpl
 import com.example.airvibe.feature.chat.domain.scanner.ChatMessageGateway
 import com.example.airvibe.feature.radar.data.device.handshake.HandshakeRequestNotificationManager
 import com.example.airvibe.feature.radar.data.device.identity.DeviceIdentityProvider
@@ -89,6 +91,13 @@ object ServiceLocator {
 
     val radarRepository: RadarRepository by lazy {
         RadarRepositoryImpl(radarDao, savedContactDao, handshakeRequestDao, profileViewDao)
+    }
+
+    val appPreferencesRepository: AppPreferencesRepository by lazy {
+        requireNotNull(appContext) {
+            "ServiceLocator.init(context) must be called before accessing preferences."
+        }
+        AppPreferencesRepositoryImpl(appContext!!)
     }
 
     val authRepository: AuthRepository by lazy {

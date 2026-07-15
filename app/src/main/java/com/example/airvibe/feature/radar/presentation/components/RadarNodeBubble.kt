@@ -111,7 +111,7 @@ fun BoxScope.RadarNodeBubble(
                     .background(
                         brush = Brush.verticalGradient(
                             colors = listOf(
-                                Color.White.copy(alpha = 0.92f),
+                                MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
                                 token.accent.copy(alpha = 0.35f),
                             ),
                         ),

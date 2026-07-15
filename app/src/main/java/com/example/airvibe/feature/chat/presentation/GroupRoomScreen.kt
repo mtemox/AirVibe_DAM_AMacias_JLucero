@@ -13,7 +13,9 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -75,13 +77,23 @@ fun GroupRoomScreen(
 
     val (snackbarHostState, snackbarFlow) = rememberUserMessages()
 
-    Box(modifier = Modifier.fillMaxSize().background(Color(0xFFFFA84D))) {
+    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val bgColor = if (isDark) MaterialTheme.colorScheme.background else Color(0xFFFFA84D)
+
+    Box(modifier = Modifier.fillMaxSize().background(bgColor)) {
+        val invertMatrix = androidx.compose.ui.graphics.ColorMatrix(floatArrayOf(
+            -1f, 0f, 0f, 0f, 255f,
+            0f, -1f, 0f, 0f, 255f,
+            0f, 0f, -1f, 0f, 255f,
+            0f, 0f, 0f, 1f, 0f
+        ))
         androidx.compose.foundation.Image(
             painter = androidx.compose.ui.res.painterResource(id = com.example.airvibe.R.drawable.wave_pattern),
             contentDescription = null,
             contentScale = androidx.compose.ui.layout.ContentScale.Crop,
             modifier = Modifier.fillMaxSize(),
-            alpha = 0.5f
+            alpha = if (isDark) 0.15f else 0.5f,
+            colorFilter = if (isDark) androidx.compose.ui.graphics.ColorFilter.colorMatrix(invertMatrix) else null
         )
         Column(
             modifier = Modifier
@@ -294,11 +306,13 @@ private fun RoomMessageBubble(
     } else {
         RoundedCornerShape(topStart = topCorner, topEnd = 8.dp, bottomStart = 8.dp, bottomEnd = 8.dp)
     }
+    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val bubbleColor = if (message.isOwn) {
-        Color(0xFFDCF8C6)
+        if (isDark) Color(0xFF005C4B) else Color(0xFFDCF8C6)
     } else {
-        Color.White
+        if (isDark) MaterialTheme.colorScheme.surface else Color.White
     }
+    val textColor = if (isDark) Color(0xFFE9EDEF) else Color(0xFF1A1C1C)
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -337,7 +351,7 @@ private fun RoomMessageBubble(
                 Text(
                     text = message.text,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = Color(0xFF1A1C1C),
+                    color = textColor,
                 )
             }
 
@@ -364,10 +378,12 @@ private fun RoomMessageMetaBox(
         horizontalArrangement = Arrangement.spacedBy(2.dp),
         modifier = modifier
     ) {
+        val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+        val timeColor = if (isDark) Color(0x99E9EDEF) else Color(0x991A1C1C)
         Text(
             text = time,
             style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-            color = Color(0x991A1C1C),
+            color = timeColor,
         )
         if (isOwn) {
             Icon(

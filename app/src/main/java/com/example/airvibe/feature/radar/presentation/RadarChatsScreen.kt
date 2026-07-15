@@ -138,7 +138,7 @@ fun RadarChatsScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.White)
+                .background(MaterialTheme.colorScheme.background)
         ) {
         // Top App Bar Area
         Row(
@@ -237,12 +237,12 @@ fun RadarChatsScreen(
                 contentAlignment = Alignment.Center
             ) {
                 if (isRadarExpanded) {
-                    Icon(imageVector = Icons.Rounded.Search, contentDescription = "Escanear", tint = Color.White, modifier = Modifier.size(24.dp))
+                    Icon(imageVector = Icons.Rounded.Search, contentDescription = "Escanear", tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(24.dp))
                 } else {
                     Box(
                         modifier = Modifier
                             .size(16.dp)
-                            .background(Color.White, CircleShape)
+                            .background(MaterialTheme.colorScheme.onPrimary, CircleShape)
                     )
                 }
             }
@@ -400,7 +400,7 @@ fun RadarChatsScreen(
                                     ) {
                                         Text(
                                             text = chat.unreadCount.toString(),
-                                            color = Color.White,
+                                            color = MaterialTheme.colorScheme.onPrimary,
                                             style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold)
                                         )
                                     }
