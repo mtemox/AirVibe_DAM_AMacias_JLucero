@@ -67,14 +67,14 @@ fun PermissionsScreen(
 
     Surface(
         modifier = modifier.fillMaxSize().systemBarsPadding(),
-        color = Color(0xFFF9F9F9) // background
+        color = MaterialTheme.colorScheme.background // background
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             // Top App Bar
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color(0xFFFFFFFF)) // surface-container-lowest
+                    .background(MaterialTheme.colorScheme.surface) // surface-container-lowest
                     .padding(horizontal = 16.dp, vertical = 8.dp)
                     .height(56.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -104,15 +104,15 @@ fun PermissionsScreen(
                         .fillMaxWidth()
                         .height(192.dp)
                         .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0xFFF3F3F4)) // surface-container-low
-                        .border(1.dp, Color(0xFFEEEEEE), RoundedCornerShape(12.dp)),
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)) // surface-container-low
+                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     Column(
                         modifier = Modifier
                             .clip(RoundedCornerShape(16.dp))
-                            .background(Color(0xCCFFFFFF))
-                            .border(1.dp, Color(0x33C4C5D7), RoundedCornerShape(16.dp))
+                            .background(MaterialTheme.colorScheme.surface)
+                            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(16.dp))
                             .padding(16.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
@@ -228,7 +228,7 @@ fun PermissionsScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color(0xE6FFFFFF))
+                    .background(MaterialTheme.colorScheme.background.copy(alpha = 0.9f))
                     .padding(16.dp)
             ) {
                 Column(modifier = Modifier.fillMaxWidth()) {
@@ -291,8 +291,8 @@ private fun PermissionToggleCard(
             .fillMaxWidth()
             .padding(vertical = 8.dp)
             .clip(RoundedCornerShape(12.dp))
-            .background(Color(0xFFFFFFFF)) // surface-container-lowest
-            .border(1.dp, Color(0xFFEEEEEE), RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surface) // surface-container-lowest
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
             .padding(16.dp),
         verticalAlignment = Alignment.Top
     ) {
@@ -331,7 +331,7 @@ private fun PermissionToggleCard(
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(16.dp))
-                    .background(Color(0xFFE8E8E8)) // surface-container-high
+                    .background(MaterialTheme.colorScheme.surfaceVariant) // surface-container-high
                     .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
                 Text(
@@ -352,7 +352,7 @@ private fun PermissionToggleCard(
 private fun CustomToggleSwitch(
     isActive: Boolean
 ) {
-    val bgColor by animateColorAsState(if (isActive) MaterialTheme.colorScheme.primaryContainer else Color(0xFFE2E2E2), label="bg")
+    val bgColor by animateColorAsState(if (isActive) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant, label="bg")
     val translationX by animateFloatAsState(if (isActive) 20f else 2f, label="x")
 
     Box(

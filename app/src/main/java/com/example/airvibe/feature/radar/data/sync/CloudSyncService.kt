@@ -67,7 +67,7 @@ class CloudSyncService(
     private suspend fun restoreContacts(ownerId: String) {
         val remote = savedContactRemote.fetchAll(ownerId).getOrNull() ?: return
         remote.forEach { dto ->
-            val local = savedContactDao.getById(dto.peerNodeId)
+            val local = savedContactDao.getByIdIncludingDeleted(dto.peerNodeId)
             if (local == null || local.isSynced) {
                 savedContactDao.upsert(dto.toEntity())
             }
@@ -136,9 +136,10 @@ class CloudSyncService(
     private suspend fun restoreChatMessages(ownerId: String) {
         val remote = chatMessageRemote.fetchAll(ownerId).getOrNull() ?: return
         remote.forEach { dto ->
-            if (chatDao.getById(dto.id) == null) {
+            val local = chatDao.getByIdIncludingDeleted(dto.id)
+            if (local == null || local.isSynced) {
                 chatDao.upsertAll(listOf(dto.toEntity()))
-                if (dto.direction == "Incoming") {
+                if (dto.direction == "Incoming" && local == null) {
                     val profile = savedContactDao.getById(dto.peerNodeId)
                     val senderName = profile?.displayName ?: "Contacto"
                     chatNotifications?.postDirectMessage(dto.peerNodeId, senderName, dto.content)

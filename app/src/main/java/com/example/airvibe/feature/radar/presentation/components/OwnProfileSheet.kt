@@ -186,7 +186,7 @@ fun OwnProfileSheet(
                                 .fillMaxSize()
                                 .clip(CircleShape)
                                 .background(MaterialTheme.colorScheme.primaryContainer)
-                                .border(4.dp, Color(0xFFEEEEEE), CircleShape)
+                                .border(4.dp, MaterialTheme.colorScheme.surfaceVariant, CircleShape)
                                 .clickable {
                                     showImageSourceDialog = true
                                 },
@@ -286,8 +286,8 @@ fun OwnProfileSheet(
                             title = "Tipo de Nodo",
                             subtitle = kind.displayName,
                             icon = if (kind == RadarNodeKind.Person) Icons.Rounded.Person else Icons.Rounded.Groups,
-                            iconBg = Color(0xFFDDE1FF),
-                            iconTint = Color(0xFF001355),
+                            iconBg = MaterialTheme.colorScheme.primaryContainer,
+                            iconTint = MaterialTheme.colorScheme.onPrimaryContainer,
                             onClick = {
                                 kind = when (kind) {
                                     RadarNodeKind.Person -> RadarNodeKind.Service
@@ -380,17 +380,17 @@ fun VibeTextField(
     modifier: Modifier = Modifier
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = modifier) {
-        Text(text = label, style = MaterialTheme.typography.labelMedium.copy(color = Color(0xFF444655)))
+        Text(text = label, style = MaterialTheme.typography.labelMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
         OutlinedTextField(
             value = value,
             onValueChange = onValueChange,
-            placeholder = { Text(placeholder, color = Color(0xFF999999)) },
+            placeholder = { Text(placeholder, color = MaterialTheme.colorScheme.outline) },
             minLines = minLines,
             maxLines = if (minLines > 1) 5 else 1,
             shape = RoundedCornerShape(12.dp),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                focusedContainerColor = Color.Transparent,
+                unfocusedContainerColor = Color.Transparent,
                 focusedBorderColor = MaterialTheme.colorScheme.primary,
                 unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
                 focusedTextColor = MaterialTheme.colorScheme.onSurface,

@@ -29,15 +29,15 @@ data class GlassTokens(
 )
 
 internal val LightGlassTokens = GlassTokens(
-    surfaceFill = Color(0x66FFFFFF),
-    surfaceFillStrong = Color(0x99FFFFFF),
-    surfaceFillSubtle = Color(0x33FFFFFF),
+    surfaceFill = Color(0xCCFFFFFF), // 80% opacity
+    surfaceFillStrong = Color(0xF2FFFFFF), // 95% opacity
+    surfaceFillSubtle = Color(0x80FFFFFF), // 50% opacity
     highlightTop = Color(0xFFFFFFFF),
-    highlightBottom = Color(0x14FFFFFF),
+    highlightBottom = Color(0x33FFFFFF),
     innerBorder = Color(0xFFFFFFFF),
     outerBorder = Color(0x1A0F172A),
-    shadowColor = Color(0x140F172A),
-    tint = Color(0x08000000),
+    shadowColor = Color(0x0A0F172A), // Lighter shadow to avoid grey bleed
+    tint = Color(0x04000000),
 )
 
 internal val DarkGlassTokens = GlassTokens(

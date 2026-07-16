@@ -15,6 +15,9 @@ interface SavedContactDao {
     @Query("SELECT * FROM saved_contacts WHERE node_id = :nodeId AND is_deleted = 0 LIMIT 1")
     suspend fun getById(nodeId: String): SavedContactEntity?
 
+    @Query("SELECT * FROM saved_contacts WHERE node_id = :nodeId LIMIT 1")
+    suspend fun getByIdIncludingDeleted(nodeId: String): SavedContactEntity?
+
     @Query("SELECT EXISTS(SELECT 1 FROM saved_contacts WHERE node_id = :nodeId AND is_deleted = 0)")
     suspend fun exists(nodeId: String): Boolean
 

@@ -84,9 +84,13 @@ interface ChatDao {
     @Query("SELECT * FROM chat_messages WHERE is_synced = 0 AND is_deleted = 0")
     suspend fun getUnsynced(): List<ChatMessageEntity>
 
-    /** Búsqueda puntual por id. */
+    /** Búsqueda puntual por id (ignora eliminados). */
     @Query("SELECT * FROM chat_messages WHERE id = :id AND is_deleted = 0 LIMIT 1")
     suspend fun getById(id: String): ChatMessageEntity?
+
+    /** Búsqueda puntual por id incluyendo eliminados (para SyncWorker). */
+    @Query("SELECT * FROM chat_messages WHERE id = :id LIMIT 1")
+    suspend fun getByIdIncludingDeleted(id: String): ChatMessageEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(message: ChatMessageEntity)

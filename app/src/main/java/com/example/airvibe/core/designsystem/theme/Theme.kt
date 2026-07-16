@@ -68,7 +68,7 @@ internal val AirVibeLightColors = lightColorScheme(
 
     surface = Color(0xFFf9f9f9),
     onSurface = Color(0xFF1a1c1c),
-    surfaceVariant = Color(0xFFe2e2e2),
+    surfaceVariant = Color(0xFFF0F2F5),
     onSurfaceVariant = Color(0xFF444655),
     surfaceTint = Color(0xFF254fdf),
 

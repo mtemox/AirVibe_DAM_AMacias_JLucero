@@ -35,7 +35,7 @@ class SupabaseChatMessageDataSource(
         supabase.postgrest.from(TABLE).delete {
             filter {
                 eq("owner_id", ownerId)
-                eq("node_id", nodeId)
+                eq("peer_node_id", nodeId)
             }
         }
     }
