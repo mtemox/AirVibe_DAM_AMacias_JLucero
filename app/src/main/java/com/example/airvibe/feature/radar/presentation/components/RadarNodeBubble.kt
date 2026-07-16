@@ -67,6 +67,10 @@ import com.example.airvibe.core.designsystem.modifiers.glassBlur
 import com.example.airvibe.core.designsystem.modifiers.glow
 import com.example.airvibe.feature.radar.domain.model.PresenceStatus
 import com.example.airvibe.feature.radar.domain.model.RadarNode
+import androidx.compose.material.icons.rounded.WorkspacePremium
+
+private val PremiumGold = Color(0xFFFFD700)
+private val PremiumGoldDark = Color(0xFFB8860B)
 
 /**
  * Burbuja flotante que representa un nodo del radar. Se posiciona
@@ -86,12 +90,14 @@ fun BoxScope.RadarNodeBubble(
 
 
     val interactionSource = remember { MutableInteractionSource() }
-    val bubbleSize: Dp = (44 + node.signalStrength * 14).dp
+    val baseBubbleSize: Dp = (44 + node.signalStrength * 14).dp
+    val bubbleSize: Dp = if (node.isPremium) baseBubbleSize * 1.08f else baseBubbleSize
     val ringSize: Dp = bubbleSize + 18.dp
     val meters = proximityMeters(node.distanceNormalized)
     val showDistance = !node.id.startsWith("pending-")
     val token = node.intentToken()
     val emergencyPulse = node.presence == PresenceStatus.Emergency
+    val isPremium = node.isPremium
 
     Column(
         modifier = modifier.align(radarAlignmentFor(node)),
@@ -102,23 +108,50 @@ fun BoxScope.RadarNodeBubble(
             contentAlignment = Alignment.Center,
         ) {
 
+            // Glow sutil animado para usuarios Premium
+            if (isPremium) {
+                val infinite = rememberInfiniteTransition(label = "premiumGlow")
+                val glowAlpha by infinite.animateFloat(
+                    initialValue = 0.3f,
+                    targetValue = 0.6f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(durationMillis = 1500, easing = androidx.compose.animation.core.FastOutSlowInEasing),
+                        repeatMode = RepeatMode.Reverse,
+                    ),
+                    label = "premiumGlowAlpha",
+                )
+                Box(
+                    modifier = Modifier
+                        .size(bubbleSize + 8.dp)
+                        .clip(CircleShape)
+                        .background(PremiumGold.copy(alpha = glowAlpha * 0.25f)),
+                )
+            }
+
             Box(
                 modifier = Modifier
                     .size(bubbleSize)
-                    .shadow(elevation = 14.dp, shape = CircleShape, clip = false)
+                    .shadow(elevation = if (isPremium) 18.dp else 14.dp, shape = CircleShape, clip = false)
                     .glassBlur(radius = 18.dp, shape = CircleShape)
                     .clip(CircleShape)
                     .background(
                         brush = Brush.verticalGradient(
-                            colors = listOf(
-                                MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
-                                token.accent.copy(alpha = 0.35f),
-                            ),
+                            colors = if (isPremium) {
+                                listOf(
+                                    MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
+                                    PremiumGold.copy(alpha = 0.25f),
+                                )
+                            } else {
+                                listOf(
+                                    MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+                                    token.accent.copy(alpha = 0.35f),
+                                )
+                            },
                         ),
                     )
                     .border(
-                        width = 2.dp,
-                        color = token.accent,
+                        width = if (isPremium) 2.5.dp else 2.dp,
+                        color = if (isPremium) PremiumGold else token.accent,
                         shape = CircleShape,
                     )
                     .clickable(
@@ -171,6 +204,38 @@ fun BoxScope.RadarNodeBubble(
                         contentDescription = token.label,
                         tint = if (emergencyPulse) Color.White else token.accent,
                         modifier = Modifier.size(chipSize * 0.62f),
+                    )
+                }
+            }
+
+            // Badge Premium en la esquina inferior izquierda
+            if (isPremium && !node.id.startsWith("pending-")) {
+                val premiumChipSize = (bubbleSize.value * 0.38f).coerceAtLeast(18f).dp
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .offset(x = (-2).dp, y = 2.dp)
+                        .size(premiumChipSize)
+                        .shadow(elevation = 6.dp, shape = CircleShape, clip = false)
+                        .glassBlur(radius = 10.dp, shape = CircleShape)
+                        .clip(CircleShape)
+                        .background(
+                            brush = Brush.linearGradient(
+                                colors = listOf(PremiumGold, PremiumGoldDark),
+                            ),
+                        )
+                        .border(
+                            width = 1.dp,
+                            color = Color.White.copy(alpha = 0.6f),
+                            shape = CircleShape,
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.WorkspacePremium,
+                        contentDescription = "Premium",
+                        tint = Color.White,
+                        modifier = Modifier.size(premiumChipSize * 0.65f),
                     )
                 }
             }

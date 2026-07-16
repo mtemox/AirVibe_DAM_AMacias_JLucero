@@ -56,6 +56,7 @@ data class DiscoveredPeer(
         premiumCatalog = profile.premiumCatalog,
         avatarUrl = profile.avatarUrl,
         avatarBase64 = profile.avatarBase64,
+        authUserId = profile.authUserId,
     )
 
     companion object {

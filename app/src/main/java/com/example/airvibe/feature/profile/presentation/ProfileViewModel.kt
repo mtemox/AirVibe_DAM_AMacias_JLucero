@@ -11,6 +11,7 @@ import com.example.airvibe.feature.chat.domain.repository.ProximityRoomRepositor
 import com.example.airvibe.feature.radar.data.local.dao.SavedContactDao
 import com.example.airvibe.feature.radar.data.sync.CloudSyncService
 import com.example.airvibe.feature.radar.domain.model.VisibilityStats
+import com.example.airvibe.feature.radar.domain.repository.PremiumRepository
 import com.example.airvibe.feature.radar.domain.repository.RadarRepository
 import com.example.airvibe.feature.radar.domain.repository.ScannerProfileRepository
 import com.example.airvibe.feature.radar.domain.scanner.ScannerProfile
@@ -28,8 +29,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 data class ProfileStats(
-    val trips: Int = 0,
-    val rating: Int = 0,
+    val conversations: Int = 0,
+    val activeRooms: Int = 0,
     val friends: Int = 0,
 )
 
@@ -42,7 +43,10 @@ data class ProfileStats(
 data class ProfileVisibilityState(
     val stats: VisibilityStats = VisibilityStats.Empty,
     val isLoading: Boolean = false,
+    /** true si tiene entitlement Y Premium activo. */
     val isPremium: Boolean = false,
+    /** true si compró Premium (aunque esté desactivado). */
+    val hasEntitlement: Boolean = false,
     val errorMessage: String? = null,
 )
 
@@ -52,6 +56,7 @@ class ProfileViewModel(
     private val authRepository: AuthRepository = ServiceLocator.authRepository,
     private val radarRepository: RadarRepository = ServiceLocator.radarRepository,
     private val cloudSyncService: CloudSyncService = ServiceLocator.cloudSyncService,
+    private val premiumRepository: PremiumRepository = ServiceLocator.premiumRepository,
     chatRepository: ChatRepository = ServiceLocator.chatRepository,
     roomRepository: ProximityRoomRepository = ServiceLocator.proximityRoomRepository,
     savedContactDao: SavedContactDao = ServiceLocator.savedContactDao,
@@ -81,8 +86,8 @@ class ProfileViewModel(
         savedContactDao.observeAll(),
     ) { chats, rooms, contacts ->
         ProfileStats(
-            trips = chats.size,
-            rating = rooms.size,
+            conversations = chats.size,
+            activeRooms = rooms.size,
             friends = contacts.size,
         )
     }.stateIn(
@@ -113,44 +118,75 @@ class ProfileViewModel(
 
     private fun observeAuthForVisibility() {
         viewModelScope.launch {
-            authRepository.currentUser.collect { user ->
-                val premium = isPremiumProfile()
+            // Combinar cambios de auth y entitlement
+            combine(
+                authRepository.currentUser,
+                premiumRepository.observeEntitlement(),
+                profileRepository.observe(),
+            ) { user, entitlement, profile ->
+                Triple(user, entitlement, profile)
+            }.collect { (user, entitlement, profile) ->
+                val hasEntitlement = entitlement
+                val isPremiumActive = entitlement && profile.isPremium && user != null
                 _visibility.update {
                     it.copy(
-                        isPremium = premium,
+                        isPremium = isPremiumActive,
+                        hasEntitlement = hasEntitlement,
                         errorMessage = null,
                     )
                 }
-                if (premium) refreshVisibility()
+                if (isPremiumActive) refreshVisibility()
             }
         }
     }
 
     /**
-     * Consideramos "Premium" si el usuario tiene sesión iniciada
-     * (auth.uid() conocido). El flag `is_premium` se actualiza
-     * server-side mediante RevenueCat (fuera de scope).
+     * Consideramos "Premium activo" si:
+     * 1. Tiene sesión iniciada (auth.uid() conocido)
+     * 2. Tiene entitlement (compró Premium)
+     * 3. Tiene Premium activo en su perfil (puede desactivarlo)
      */
-    private fun isPremiumProfile(): Boolean = authRepository.currentUser.value != null
+    private fun isPremiumProfile(): Boolean {
+        val user = authRepository.currentUser.value
+        val entitlement = premiumRepository.hasEntitlement()
+        val profilePremium = profileRepository.current().isPremium
+        return user != null && entitlement && profilePremium
+    }
 
     fun refreshVisibility() {
         if (!_visibility.value.isPremium) return
-        _visibility.update { it.copy(isLoading = true) }
+        _visibility.update { it.copy(isLoading = true, errorMessage = null) }
         viewModelScope.launch {
             val userId = (authRepository.currentUser.value as? AuthUser)?.id
-                ?: profileRepository.current().id
-            // `pullVisibility` ya devuelve Result; no envolver
-            // doblemente con runCatching.
-            val stats: VisibilityStats = runCatching {
-                cloudSyncService.pullVisibility(userId).getOrDefault(VisibilityStats.Empty)
-            }.getOrDefault(VisibilityStats.Empty)
-            _visibility.update {
-                it.copy(
-                    isLoading = false,
-                    stats = stats,
-                    errorMessage = it.errorMessage,
-                )
+            if (userId == null) {
+                _visibility.update {
+                    it.copy(
+                        isLoading = false,
+                        errorMessage = "Inicia sesión para ver estadísticas",
+                    )
+                }
+                return@launch
             }
+            val result = cloudSyncService.pullVisibility(userId)
+            result.fold(
+                onSuccess = { stats ->
+                    _visibility.update {
+                        it.copy(
+                            isLoading = false,
+                            stats = stats,
+                            errorMessage = null,
+                        )
+                    }
+                },
+                onFailure = { error ->
+                    _visibility.update {
+                        it.copy(
+                            isLoading = false,
+                            errorMessage = error.message ?: "Error al cargar estadísticas",
+                        )
+                    }
+                },
+            )
         }
     }
 

@@ -156,6 +156,7 @@ class ScannerProfileRepositoryImpl(
         avatarUrl = prefs.getString(KEY_AVATAR_URL, null)?.takeIf { it.isNotBlank() },
         avatarBase64 = prefs.getString(KEY_AVATAR_BASE64, null)?.takeIf { it.isNotBlank() },
         tags = decodeTags(prefs.getString(KEY_TAGS, null)),
+        authUserId = currentAuthUserId(),
     )
 
     private fun encodeTags(tags: List<String>): String {

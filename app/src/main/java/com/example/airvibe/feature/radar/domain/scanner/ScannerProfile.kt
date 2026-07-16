@@ -40,4 +40,6 @@ data class ScannerProfile(
     val tags: List<String> = emptyList(),
     val avatarUrl: String? = null,
     val avatarBase64: String? = null,
+    /** UUID de Supabase auth.users.id para usuarios autenticados. */
+    val authUserId: String? = null,
 )

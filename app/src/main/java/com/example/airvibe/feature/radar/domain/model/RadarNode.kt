@@ -63,6 +63,8 @@ data class RadarNode(
     val premiumCatalog: String? = null,
     val avatarUrl: String? = null,
     val avatarBase64: String? = null,
+    /** UUID de Supabase auth.users.id para telemetría de visibilidad Premium. */
+    val authUserId: String? = null,
 ) {
     init {
         require(angleDegrees in 0f..360f) { "angleDegrees must be in 0..360" }

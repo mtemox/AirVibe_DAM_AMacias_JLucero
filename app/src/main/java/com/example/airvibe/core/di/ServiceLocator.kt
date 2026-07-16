@@ -34,11 +34,13 @@ import com.example.airvibe.feature.radar.data.remote.SupabaseAvatarDataSource
 import com.example.airvibe.feature.radar.data.remote.SupabaseSavedContactDataSource
 import com.example.airvibe.feature.radar.data.remote.SupabaseTelemetryDataSource
 import com.example.airvibe.feature.radar.data.sync.CloudSyncService
+import com.example.airvibe.feature.radar.data.repository.PremiumRepositoryImpl
 import com.example.airvibe.feature.radar.data.repository.RadarRepositoryImpl
 import com.example.airvibe.feature.radar.data.repository.ScannerProfileRepositoryImpl
 import com.example.airvibe.feature.radar.data.sync.AirVibeWorkManagerConfiguration
 import com.example.airvibe.feature.radar.data.sync.SyncScheduler
 import com.example.airvibe.feature.radar.domain.remote.RemoteNodeDataSource
+import com.example.airvibe.feature.radar.domain.repository.PremiumRepository
 import com.example.airvibe.feature.radar.domain.repository.RadarRepository
 import com.example.airvibe.feature.radar.domain.repository.ScannerProfileRepository
 import com.example.airvibe.feature.radar.domain.scanner.RadarScanner
@@ -183,6 +185,15 @@ object ServiceLocator {
             context = requireNotNull(appContext) { "ServiceLocator.init(context) required." },
             deviceIdentity = deviceIdentityProvider,
             profileRemote = profileRemoteDataSource,
+            currentAuthUserId = { authRepository.currentUser.value?.id },
+        )
+    }
+
+    val premiumRepository: PremiumRepository by lazy {
+        PremiumRepositoryImpl(
+            context = requireNotNull(appContext) { "ServiceLocator.init(context) required." },
+            profileDataSource = profileRemoteDataSource,
+            scannerProfileRepository = scannerProfileRepository,
             currentAuthUserId = { authRepository.currentUser.value?.id },
         )
     }

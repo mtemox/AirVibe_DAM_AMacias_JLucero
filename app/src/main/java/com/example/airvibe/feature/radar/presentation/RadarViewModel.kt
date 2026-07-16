@@ -95,19 +95,22 @@ class RadarViewModel(
             var lastSeen: Set<String> = emptySet()
             scanner.liveNodes
                 .onEach { live ->
-                    val current = live
+                    val validNodes = live
                         .filter { !it.id.startsWith("pending-") && !it.id.startsWith(RadarSeedData.SEED_ID_PREFIX) }
-                        .map { it.id }
-                        .toSet()
+                    val current = validNodes.map { it.id }.toSet()
                     val localNodeId = profileRepository.current().id
                     val newOnes = current - lastSeen
                     newOnes.forEach { nodeId ->
                         if (nodeId != localNodeId) {
-                            repository.recordProfileEvent(
-                                targetUserId = nodeId,
-                                sourceNodeId = localNodeId,
-                                kind = com.example.airvibe.feature.radar.data.local.entity.ProfileViewEntity.KIND_VIEW,
-                            )
+                            // Solo registrar telemetría para peers Premium con authUserId válido
+                            val node = validNodes.find { it.id == nodeId }
+                            if (node != null && node.isPremium && !node.authUserId.isNullOrBlank()) {
+                                repository.recordProfileEvent(
+                                    targetUserId = node.authUserId,
+                                    sourceNodeId = localNodeId,
+                                    kind = com.example.airvibe.feature.radar.data.local.entity.ProfileViewEntity.KIND_VIEW,
+                                )
+                            }
                         }
                     }
                     lastSeen = current
@@ -273,12 +276,12 @@ class RadarViewModel(
             ?: _uiState.value.nodes.firstOrNull { it.id == nodeId }
             ?: return
         // Feature 5: registrar un "Tap" para el dashboard de
-        // visibilidad del peer.
+        // visibilidad del peer. Solo para Premium con authUserId.
         viewModelScope.launch {
             val localNodeId = profileRepository.current().id
-            if (nodeId != localNodeId) {
+            if (nodeId != localNodeId && node.isPremium && !node.authUserId.isNullOrBlank()) {
                 repository.recordProfileEvent(
-                    targetUserId = nodeId,
+                    targetUserId = node.authUserId,
                     sourceNodeId = localNodeId,
                     kind = com.example.airvibe.feature.radar.data.local.entity.ProfileViewEntity.KIND_TAP,
                 )
