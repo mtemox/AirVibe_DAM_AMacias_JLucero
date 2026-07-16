@@ -96,7 +96,7 @@ fun ChatComposer(
                     enabled = enabled,
                     singleLine = false,
                     textStyle = LocalTextStyle.current.copy(
-                        color = Color(0xFF1A1C1C),
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontSize = 18.sp
                     ),
                     cursorBrush = SolidColor(Color(0xFF075E54)),
